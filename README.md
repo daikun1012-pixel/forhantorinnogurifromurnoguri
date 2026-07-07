@@ -38,6 +38,32 @@ src/
   types/        핵심 타입
 ```
 
+## Cloudflare D1
+
+프론트엔드는 아직 목업 데이터로 동작하지만, D1 스키마 기반이 준비되어 있습니다.
+
+- 바인딩 이름: `DB` (`wrangler.toml`)
+- 런타임 접근: Pages Functions 내부에서 `env.DB`
+- 타입: `functions/types.ts`의 `Env` 인터페이스
+- 마이그레이션: `migrations/` (SQLite)
+
+### 초기 설정
+```bash
+# 1) D1 데이터베이스 생성 (최초 1회)
+npx wrangler d1 create couple-place-wishlist
+#    출력된 database_id 를 wrangler.toml 의 database_id 에 붙여넣기
+
+# 2) 마이그레이션 적용
+npm run db:migrate:local    # 로컬(.wrangler) DB에 적용
+npm run db:migrate:remote   # 원격 D1에 적용
+
+# 새 마이그레이션 추가
+npx wrangler d1 migrations create DB <name>
+```
+
+스키마 요약: `users`, `couples`, `couple_members`, `places`,
+`place_reactions`, `place_comments` (외래키 · 인덱스 포함).
+
 ## 아직 구현하지 않은 것 (의도적)
-Cloudflare D1 / Workers API, 네이버 지도·지역검색, 실제 인증,
+Cloudflare Workers API 라우트, 네이버 지도·지역검색, 실제 인증,
 AI 추천, 사진 업로드.
