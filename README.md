@@ -63,6 +63,38 @@ npx wrangler d1 migrations create DB <name>
 
 스키마 요약: `users`, `couples`, `couple_members`, `places`,
 `place_reactions`, `place_comments` (외래키 · 인덱스 포함).
+시드 데이터(`0002_seed.sql`): `user_daiki`, `user_partner`, `couple_demo`.
+
+### Pages D1 바인딩
+Cloudflare Pages 프로젝트 설정 → Functions → D1 database bindings 에서
+변수 이름 `DB` 로 D1 데이터베이스를 연결하세요. 런타임에서는 `env.DB` 로
+접근합니다 (`functions/types.ts`의 `Env`).
+
+## API (Cloudflare Pages Functions)
+
+임시 목업 인증 사용: `currentUserId = user_daiki`,
+`currentCoupleId = couple_demo`. 응답 형식은 `{ ok, data }` 또는
+`{ ok, error }`. **프론트엔드는 아직 이 API에 연결되어 있지 않습니다
+(계속 목업 데이터로 동작).**
+
+| Method | Path | 설명 |
+| ------ | ---- | ---- |
+| GET | `/api/health` | 헬스 체크 |
+| GET | `/api/places` | 커플의 장소 목록 |
+| POST | `/api/places` | 장소 추가 |
+| GET | `/api/places/:placeId` | 장소 + 반응 + 댓글 |
+| PATCH | `/api/places/:placeId` | 장소 수정 |
+| DELETE | `/api/places/:placeId` | 장소 삭제 |
+| PUT | `/api/places/:placeId/reaction` | 내 반응 upsert |
+| GET | `/api/places/:placeId/comments` | 댓글 목록 |
+| POST | `/api/places/:placeId/comments` | 댓글 추가 |
+| DELETE | `/api/comments/:commentId` | 댓글 삭제 |
+
+로컬에서 Functions + D1 실행:
+```bash
+npm run build
+npx wrangler pages dev dist --d1 DB
+```
 
 ## 아직 구현하지 않은 것 (의도적)
 Cloudflare Workers API 라우트, 네이버 지도·지역검색, 실제 인증,
