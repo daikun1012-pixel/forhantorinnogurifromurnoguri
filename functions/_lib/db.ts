@@ -34,6 +34,8 @@ const DDL = [
      category TEXT NOT NULL,
      address TEXT NOT NULL DEFAULT '',
      map_url TEXT NOT NULL DEFAULT '',
+     latitude REAL,
+     longitude REAL,
      created_by TEXT NOT NULL REFERENCES users(id),
      created_at TEXT NOT NULL,
      updated_at TEXT NOT NULL
@@ -62,15 +64,31 @@ const DDL = [
   `CREATE INDEX IF NOT EXISTS idx_comments_place ON place_comments(place_id, created_at)`,
 ];
 
+// Columns added after the initial release. Applied with ALTER TABLE for
+// databases created before the column existed; "duplicate column" errors are
+// expected and ignored.
+const ALTERS = [
+  `ALTER TABLE places ADD COLUMN latitude REAL`,
+  `ALTER TABLE places ADD COLUMN longitude REAL`,
+];
+
+async function migrate(db: D1Database): Promise<void> {
+  await db.batch(DDL.map((sql) => db.prepare(sql)));
+  for (const sql of ALTERS) {
+    try {
+      await db.prepare(sql).run();
+    } catch {
+      // Column already exists — safe to ignore.
+    }
+  }
+}
+
 export function ensureSchema(db: D1Database): Promise<void> {
   if (!schemaReady) {
-    schemaReady = db
-      .batch(DDL.map((sql) => db.prepare(sql)))
-      .then(() => undefined)
-      .catch((err) => {
-        schemaReady = null;
-        throw err;
-      });
+    schemaReady = migrate(db).catch((err) => {
+      schemaReady = null;
+      throw err;
+    });
   }
   return schemaReady;
 }

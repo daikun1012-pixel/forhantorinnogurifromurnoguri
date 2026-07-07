@@ -54,6 +54,8 @@ npx wrangler pages dev dist --d1 DB
 | Method | Path | 설명 |
 | ------ | ---- | ---- |
 | GET | `/api/health` | 헬스 체크 |
+| GET | `/api/config` | 프론트 공개 설정(지도 client id 등) |
+| GET | `/api/search?query=` | 네이버 장소 검색 프록시 |
 | POST | `/api/auth/login` | 이름으로 사용자 생성 |
 | GET | `/api/me` | 현재 사용자·커플·멤버 |
 | POST | `/api/couples` | 커플 공간 생성 |
@@ -68,5 +70,27 @@ npx wrangler pages dev dist --d1 DB
 | POST | `/api/places/:id/comments` | 댓글 추가 |
 | DELETE | `/api/comments/:id` | 댓글 삭제 |
 
+## 네이버 지도 / 장소검색 설정
+
+지도와 장소검색은 아래 환경 변수가 설정되면 자동으로 켜집니다(없으면 앱은
+정상 동작하고 해당 기능만 안내 문구로 대체). Cloudflare Pages →
+Settings → **Environment variables** 에서 **Production/Preview 각각** 등록:
+
+| 변수 | 용도 | 발급처 | 비고 |
+| ---- | ---- | ------ | ---- |
+| `NAVER_MAP_CLIENT_ID` | 지도 표시 | 네이버 클라우드 플랫폼(NCP) → Maps | 공개값 |
+| `NAVER_MAP_KEY_PARAM` | 스크립트 파라미터명 | — | 선택. 기본 `ncpClientId`, 신규 키면 `ncpKeyId` |
+| `NAVER_SEARCH_CLIENT_ID` | 장소검색 | 네이버 개발자센터(Developers) → 검색 API | |
+| `NAVER_SEARCH_CLIENT_SECRET` | 장소검색 | 위와 동일 | **Secret 으로 등록** |
+
+추가 설정:
+- **NCP Maps**: Web 서비스 URL 화이트리스트에 배포 도메인(`*.pages.dev`,
+  커스텀 도메인)을 등록해야 지도가 로드됩니다.
+- **검색 API**: 애플리케이션에서 "검색" 사용 설정.
+- 검색 결과의 좌표(`mapx`/`mapy`, WGS84×10⁷)는 서버에서 위·경도로 변환해
+  장소에 저장하고 지도 마커로 표시합니다.
+
+변수 저장 후 재배포하면 적용됩니다.
+
 ## 이후 확장
-네이버 지도/장소검색 API, 데이트 코스, 사진 첨부, 방문 기록, AI 추천 등.
+데이트 코스 만들기, 날짜별 계획, 사진 첨부, 방문 기록, AI 추천 등.

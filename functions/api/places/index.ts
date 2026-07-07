@@ -1,6 +1,6 @@
 import type { Env } from "../../types";
 import { newId } from "../../_lib/db";
-import { handle, oneOf, readJson, str, success } from "../../_lib/http";
+import { handle, numOrNull, oneOf, readJson, str, success } from "../../_lib/http";
 import { requireCouple, requireUser } from "../../_lib/session";
 import { CATEGORIES, toPlace, toReaction } from "../../_lib/mappers";
 
@@ -54,14 +54,16 @@ export const onRequestPost: PagesFunction<Env> = ({ env, request }) =>
       category: oneOf(body, "category", CATEGORIES, "etc"),
       address: str(body, "address", { required: false, max: 300 }),
       map_url: str(body, "mapUrl", { required: false, max: 500 }),
+      latitude: numOrNull(body, "latitude"),
+      longitude: numOrNull(body, "longitude"),
       created_by: ctx.userId,
       created_at: now,
       updated_at: now,
     };
     await env.DB.prepare(
       `INSERT INTO places
-         (id, couple_id, name, category, address, map_url, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, couple_id, name, category, address, map_url, latitude, longitude, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
         place.id,
@@ -70,6 +72,8 @@ export const onRequestPost: PagesFunction<Env> = ({ env, request }) =>
         place.category,
         place.address,
         place.map_url,
+        place.latitude,
+        place.longitude,
         place.created_by,
         place.created_at,
         place.updated_at,
