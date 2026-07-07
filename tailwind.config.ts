@@ -12,6 +12,7 @@ export default {
           300: "#fda4b3",
           400: "#fb7185",
           500: "#f43f5e",
+          600: "#e11d48",
         },
         cream: "#fffaf6",
       },
@@ -27,6 +28,7 @@ export default {
       },
       boxShadow: {
         card: "0 4px 20px -6px rgba(244, 63, 94, 0.15)",
+        soft: "0 2px 12px -4px rgba(0,0,0,0.08)",
       },
     },
   },

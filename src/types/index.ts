@@ -1,8 +1,8 @@
 export interface User {
   id: string;
   name: string;
-  email: string;
   avatarColor: string;
+  createdAt: string;
 }
 
 export interface Couple {
@@ -17,30 +17,17 @@ export interface CoupleMember {
   userId: string;
   role: "owner" | "partner";
   joinedAt: string;
+  user: User;
 }
 
 export type PlaceCategory =
   | "cafe"
   | "restaurant"
-  | "activity"
+  | "exhibition"
+  | "walk"
   | "travel"
   | "shopping"
   | "etc";
-
-export interface Place {
-  id: string;
-  coupleId: string;
-  name: string;
-  category: PlaceCategory;
-  address: string;
-  roadAddress: string;
-  latitude: number;
-  longitude: number;
-  sourceUrl: string;
-  createdBy: string;
-  createdAt: string;
-  updatedAt: string;
-}
 
 export type Priority = "low" | "medium" | "high";
 
@@ -62,4 +49,33 @@ export interface PlaceComment {
   userId: string;
   body: string;
   createdAt: string;
+}
+
+export interface Place {
+  id: string;
+  coupleId: string;
+  name: string;
+  category: PlaceCategory;
+  address: string;
+  mapUrl: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A place plus the couple's reactions (used by list + detail). */
+export interface PlaceWithReactions extends Place {
+  reactions: PlaceReaction[];
+}
+
+export interface PlaceDetail extends Place {
+  reactions: PlaceReaction[];
+  comments: PlaceComment[];
+}
+
+/** Current session: the logged-in user and their couple (if any). */
+export interface SessionInfo {
+  user: User;
+  couple: Couple | null;
+  members: CoupleMember[];
 }

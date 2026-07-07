@@ -2,8 +2,9 @@ import type { PlaceCategory, Priority } from "@/types";
 
 export const categoryLabels: Record<PlaceCategory, string> = {
   cafe: "카페",
-  restaurant: "맛집",
-  activity: "액티비티",
+  restaurant: "식당",
+  exhibition: "전시",
+  walk: "산책",
   travel: "여행",
   shopping: "쇼핑",
   etc: "기타",
@@ -12,7 +13,8 @@ export const categoryLabels: Record<PlaceCategory, string> = {
 export const categoryEmoji: Record<PlaceCategory, string> = {
   cafe: "☕️",
   restaurant: "🍽️",
-  activity: "🏄",
+  exhibition: "🖼️",
+  walk: "🌳",
   travel: "✈️",
   shopping: "🛍️",
   etc: "📍",
@@ -30,13 +32,15 @@ export const priorityClasses: Record<Priority, string> = {
   high: "bg-blush-100 text-blush-500",
 };
 
-export function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "long",
-    day: "numeric",
-  }).format(d);
-}
+export const categoryList: PlaceCategory[] = [
+  "cafe",
+  "restaurant",
+  "exhibition",
+  "walk",
+  "travel",
+  "shopping",
+  "etc",
+];
 
 export function formatDateTime(iso: string): string {
   const d = new Date(iso);

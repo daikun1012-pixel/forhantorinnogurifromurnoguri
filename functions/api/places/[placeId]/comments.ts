@@ -1,47 +1,47 @@
 import type { Env } from "../../../types";
-import { CURRENT_COUPLE_ID, CURRENT_USER_ID } from "../../../_lib/auth";
-import {
-  HttpError,
-  handle,
-  readJson,
-  requireString,
-  success,
-} from "../../../_lib/http";
-import { rowToComment } from "../../../_lib/mappers";
+import { HttpError, handle, readJson, str, success } from "../../../_lib/http";
+import { newId } from "../../../_lib/db";
+import { requireCouple, requireUser } from "../../../_lib/session";
+import type { Ctx } from "../../../_lib/session";
+import { toComment } from "../../../_lib/mappers";
 
-async function assertPlace(env: Env, placeId: string) {
-  const place = await env.DB.prepare(
-    `SELECT id FROM places WHERE id = ? AND couple_id = ?`,
-  )
-    .bind(placeId, CURRENT_COUPLE_ID)
+async function assertPlace(ctx: Ctx, coupleId: string, placeId: string) {
+  const place = await ctx.db
+    .prepare(`SELECT id FROM places WHERE id = ? AND couple_id = ?`)
+    .bind(placeId, coupleId)
     .first();
-  if (!place) throw new HttpError("Place not found", 404);
+  if (!place) throw new HttpError("장소를 찾을 수 없습니다", 404);
 }
 
 // GET /api/places/:placeId/comments
-export const onRequestGet: PagesFunction<Env> = ({ env, params }) =>
+export const onRequestGet: PagesFunction<Env> = ({ env, request, params }) =>
   handle(async () => {
+    const ctx = await requireUser(env, request);
+    const coupleId = await requireCouple(ctx);
     const placeId = String(params.placeId);
-    await assertPlace(env, placeId);
-    const { results } = await env.DB.prepare(
-      `SELECT * FROM place_comments WHERE place_id = ? ORDER BY created_at ASC`,
-    )
+    await assertPlace(ctx, coupleId, placeId);
+    const { results } = await ctx.db
+      .prepare(
+        `SELECT * FROM place_comments WHERE place_id = ? ORDER BY created_at ASC`,
+      )
       .bind(placeId)
       .all();
-    return success((results ?? []).map(rowToComment));
+    return success((results ?? []).map(toComment));
   });
 
-// POST /api/places/:placeId/comments
-export const onRequestPost: PagesFunction<Env> = ({ env, params, request }) =>
+// POST /api/places/:placeId/comments { body }
+export const onRequestPost: PagesFunction<Env> = ({ env, request, params }) =>
   handle(async () => {
+    const ctx = await requireUser(env, request);
+    const coupleId = await requireCouple(ctx);
     const placeId = String(params.placeId);
-    await assertPlace(env, placeId);
+    await assertPlace(ctx, coupleId, placeId);
     const body = await readJson(request);
     const comment = {
-      id: crypto.randomUUID(),
+      id: newId("cmt"),
       place_id: placeId,
-      user_id: CURRENT_USER_ID,
-      body: requireString(body, "body"),
+      user_id: ctx.userId,
+      body: str(body, "body", { max: 1000 }),
       created_at: new Date().toISOString(),
     };
     await env.DB.prepare(
@@ -56,5 +56,5 @@ export const onRequestPost: PagesFunction<Env> = ({ env, params, request }) =>
         comment.created_at,
       )
       .run();
-    return success(rowToComment(comment), 201);
+    return success(toComment(comment), 201);
   });
