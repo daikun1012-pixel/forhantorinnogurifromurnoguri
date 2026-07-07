@@ -1,0 +1,12 @@
+name = "couple-place-wishlist"
+compatibility_date = "2025-01-01"
+pages_build_output_dir = "dist"
+
+# Cloudflare D1 binding.
+# Runtime access is via `env.DB` inside Pages Functions.
+# Replace `database_id` with the id from `wrangler d1 create <name>`.
+[[d1_databases]]
+binding = "DB"
+database_name = "couple-place-wishlist"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+migrations_dir = "migrations"
