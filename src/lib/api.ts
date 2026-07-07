@@ -8,6 +8,22 @@ import type {
   User,
 } from "@/types";
 
+export interface AppConfig {
+  naverMapClientId: string;
+  naverMapKeyParam: string;
+  searchEnabled: boolean;
+}
+
+export interface SearchResult {
+  name: string;
+  category: string;
+  naverCategory: string;
+  address: string;
+  mapUrl: string;
+  latitude: number | null;
+  longitude: number | null;
+}
+
 const USER_KEY = "cdw_user_id";
 
 export function getStoredUserId(): string | null {
@@ -63,12 +79,18 @@ export const api = {
   joinCouple: (code: string) =>
     req<Couple>("/couples/join", { method: "POST", body: { code } }),
 
+  getConfig: () => req<AppConfig>("/config"),
+  search: (query: string) =>
+    req<SearchResult[]>(`/search?query=${encodeURIComponent(query)}`),
+
   listPlaces: () => req<PlaceWithReactions[]>("/places"),
   createPlace: (input: {
     name: string;
     category: string;
     address?: string;
     mapUrl?: string;
+    latitude?: number | null;
+    longitude?: number | null;
   }) => req<PlaceWithReactions>("/places", { method: "POST", body: input }),
   getPlace: (id: string) => req<PlaceDetail>(`/places/${id}`),
   deletePlace: (id: string) =>

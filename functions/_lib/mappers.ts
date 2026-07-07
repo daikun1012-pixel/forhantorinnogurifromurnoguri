@@ -62,6 +62,8 @@ export function toPlace(r: Row): Place {
     category: r.category as Place["category"],
     address: String(r.address ?? ""),
     mapUrl: String(r.map_url ?? ""),
+    latitude: r.latitude == null ? null : Number(r.latitude),
+    longitude: r.longitude == null ? null : Number(r.longitude),
     createdBy: String(r.created_by),
     createdAt: String(r.created_at),
     updatedAt: String(r.updated_at),

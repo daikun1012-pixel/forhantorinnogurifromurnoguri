@@ -58,6 +58,8 @@ export interface Place {
   category: PlaceCategory;
   address: string;
   mapUrl: string;
+  latitude: number | null;
+  longitude: number | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
