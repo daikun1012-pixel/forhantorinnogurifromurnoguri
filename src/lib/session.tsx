@@ -7,12 +7,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { api, getStoredUserId, setStoredUserId } from "@/lib/api";
+import { api, getStoredUserId, setStoredUserId, type AppConfig } from "@/lib/api";
 import type { SessionInfo } from "@/types";
 
 interface SessionState {
   loading: boolean;
   session: SessionInfo | null;
+  config: AppConfig | null;
   login: (name: string) => Promise<void>;
   logout: () => void;
   refresh: () => Promise<void>;
@@ -23,6 +24,7 @@ const SessionContext = createContext<SessionState | null>(null);
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<SessionInfo | null>(null);
+  const [config, setConfig] = useState<AppConfig | null>(null);
 
   const refresh = useCallback(async () => {
     if (!getStoredUserId()) {
@@ -35,6 +37,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setStoredUserId(null);
       setSession(null);
     }
+  }, []);
+
+  useEffect(() => {
+    void api.getConfig().then(setConfig).catch(() => setConfig(null));
   }, []);
 
   useEffect(() => {
@@ -56,8 +62,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<SessionState>(
-    () => ({ loading, session, login, logout, refresh }),
-    [loading, session, login, logout, refresh],
+    () => ({ loading, session, config, login, logout, refresh }),
+    [loading, session, config, login, logout, refresh],
   );
 
   return (

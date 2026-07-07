@@ -1,12 +1,25 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
+import { useSession } from "@/lib/session";
+import { loadNaverMaps } from "@/lib/naver";
 import { categoryEmoji } from "@/lib/format";
-import { ErrorState, Spinner } from "@/components/ui";
+import { PlaceDetailModal } from "@/components/PlaceDetailModal";
+import { EmptyState, ErrorState, Spinner } from "@/components/ui";
 import type { PlaceWithReactions } from "@/types";
 
 export function MapPage() {
+  const { session, config } = useSession();
+  const members = session?.members ?? [];
+  const currentUserId = session?.user.id ?? "";
+
   const [places, setPlaces] = useState<PlaceWithReactions[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  const mapEl = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
 
   const load = useCallback(async () => {
     setError(null);
@@ -21,47 +34,98 @@ export function MapPage() {
     void load();
   }, [load]);
 
+  const hasKey = Boolean(config?.naverMapClientId);
+  const located = (places ?? []).filter(
+    (p) => p.latitude != null && p.longitude != null,
+  );
+
+  // Initialise / update the Naver map.
+  useEffect(() => {
+    if (!hasKey || !config || !mapEl.current || !places) return;
+    let cancelled = false;
+    const located = places.filter(
+      (p) => p.latitude != null && p.longitude != null,
+    );
+
+    loadNaverMaps(config.naverMapClientId, config.naverMapKeyParam)
+      .then((naver) => {
+        if (cancelled || !mapEl.current) return;
+
+        const center =
+          located.length > 0
+            ? new naver.maps.LatLng(located[0].latitude, located[0].longitude)
+            : new naver.maps.LatLng(37.5665, 126.978); // Seoul
+
+        if (!mapRef.current) {
+          mapRef.current = new naver.maps.Map(mapEl.current, {
+            center,
+            zoom: 12,
+          });
+        }
+
+        markersRef.current.forEach((m) => m.setMap(null));
+        markersRef.current = [];
+
+        const bounds =
+          located.length > 0 ? new naver.maps.LatLngBounds() : null;
+        located.forEach((p) => {
+          const pos = new naver.maps.LatLng(p.latitude, p.longitude);
+          const marker = new naver.maps.Marker({ position: pos, map: mapRef.current });
+          naver.maps.Event.addListener(marker, "click", () => setOpenId(p.id));
+          markersRef.current.push(marker);
+          bounds?.extend(pos);
+        });
+        if (bounds && located.length > 1) mapRef.current.fitBounds(bounds);
+        else mapRef.current.setCenter(center);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setMapError(err instanceof Error ? err.message : "지도 로드 실패");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasKey, config, places]);
+
   return (
     <div>
       <h1 className="mb-4 text-xl font-bold text-zinc-800">지도</h1>
 
-      <div className="overflow-hidden rounded-3xl ring-1 ring-blush-100">
+      {!hasKey ? (
+        <MapPlaceholder />
+      ) : mapError ? (
+        <ErrorState message={mapError} />
+      ) : (
         <div
-          className="flex h-64 flex-col items-center justify-center bg-blush-50 text-center"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 20% 30%, rgba(253,164,179,0.25) 0, transparent 40%), radial-gradient(circle at 80% 70%, rgba(96,165,250,0.2) 0, transparent 40%)",
-          }}
-        >
-          <div className="text-5xl">🗺️</div>
-          <h2 className="mt-3 text-base font-semibold text-zinc-700">
-            지도는 준비 중이에요
-          </h2>
-          <p className="mt-1 max-w-xs px-6 text-sm text-zinc-400">
-            네이버 지도 연동은 다음 단계에서 추가될 예정입니다. 지금은 저장된
-            장소를 아래 목록으로 볼 수 있어요.
-          </p>
-        </div>
-      </div>
+          ref={mapEl}
+          className="h-72 w-full overflow-hidden rounded-3xl ring-1 ring-blush-100"
+        />
+      )}
 
       <div className="mt-4">
         {error ? (
           <ErrorState message={error} onRetry={load} />
         ) : !places ? (
           <Spinner />
+        ) : places.length === 0 ? (
+          <EmptyState emoji="📍" title="아직 저장된 장소가 없어요" />
         ) : (
           <>
             <h3 className="mb-2 text-sm font-semibold text-zinc-500">
-              지도에 표시될 장소 ({places.length})
+              장소 {places.length} · 지도 표시 {located.length}
             </h3>
             <div className="space-y-2">
               {places.map((p) => (
-                <div
+                <button
                   key={p.id}
-                  className="flex items-center gap-3 rounded-2xl bg-white px-3 py-2.5 ring-1 ring-blush-50"
+                  type="button"
+                  onClick={() => setOpenId(p.id)}
+                  className="flex w-full items-center gap-3 rounded-2xl bg-white px-3 py-2.5 text-left ring-1 ring-blush-50 hover:ring-blush-200"
                 >
                   <span className="text-lg">{categoryEmoji[p.category]}</span>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold text-zinc-700">
                       {p.name}
                     </div>
@@ -71,11 +135,47 @@ export function MapPage() {
                       </div>
                     )}
                   </div>
-                </div>
+                  {p.latitude == null && (
+                    <span className="chip bg-zinc-50 text-zinc-400">좌표 없음</span>
+                  )}
+                </button>
               ))}
             </div>
           </>
         )}
+      </div>
+
+      {openId && (
+        <PlaceDetailModal
+          placeId={openId}
+          members={members}
+          currentUserId={currentUserId}
+          onClose={() => setOpenId(null)}
+          onChanged={load}
+        />
+      )}
+    </div>
+  );
+}
+
+function MapPlaceholder() {
+  return (
+    <div className="overflow-hidden rounded-3xl ring-1 ring-blush-100">
+      <div
+        className="flex h-64 flex-col items-center justify-center bg-blush-50 text-center"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 20% 30%, rgba(253,164,179,0.25) 0, transparent 40%), radial-gradient(circle at 80% 70%, rgba(96,165,250,0.2) 0, transparent 40%)",
+        }}
+      >
+        <div className="text-5xl">🗺️</div>
+        <h2 className="mt-3 text-base font-semibold text-zinc-700">
+          지도를 사용하려면 설정이 필요해요
+        </h2>
+        <p className="mt-1 max-w-xs px-6 text-sm text-zinc-400">
+          네이버 지도 Client ID가 아직 설정되지 않았습니다. 설정되면 저장된
+          장소가 지도에 표시됩니다.
+        </p>
       </div>
     </div>
   );

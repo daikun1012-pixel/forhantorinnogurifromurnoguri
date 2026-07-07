@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, type SearchResult } from "@/lib/api";
+import { useSession } from "@/lib/session";
 import { categoryEmoji, categoryLabels, categoryList } from "@/lib/format";
 import type { PlaceCategory, PlaceWithReactions } from "@/types";
 import { Modal } from "./Modal";
@@ -11,12 +12,49 @@ export function AddPlaceModal({
   onClose: () => void;
   onCreated: (place: PlaceWithReactions) => void;
 }) {
+  const { config } = useSession();
+  const searchEnabled = config?.searchEnabled ?? false;
+
   const [name, setName] = useState("");
   const [category, setCategory] = useState<PlaceCategory>("cafe");
   const [address, setAddress] = useState("");
   const [mapUrl, setMapUrl] = useState("");
+  const [coords, setCoords] = useState<{ lat: number | null; lng: number | null }>(
+    { lat: null, lng: null },
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Naver search state.
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SearchResult[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  const runSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+    setSearching(true);
+    setSearchError(null);
+    try {
+      setResults(await api.search(query.trim()));
+    } catch (err) {
+      setSearchError(err instanceof ApiError ? err.message : "검색 실패");
+      setResults(null);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const pick = (r: SearchResult) => {
+    setName(r.name);
+    setCategory(r.category as PlaceCategory);
+    setAddress(r.address);
+    setMapUrl(r.mapUrl);
+    setCoords({ lat: r.latitude, lng: r.longitude });
+    setResults(null);
+    setQuery("");
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,6 +70,8 @@ export function AddPlaceModal({
         category,
         address: address.trim(),
         mapUrl: mapUrl.trim(),
+        latitude: coords.lat,
+        longitude: coords.lng,
       });
       onCreated(place);
       onClose();
@@ -44,6 +84,56 @@ export function AddPlaceModal({
   return (
     <Modal onClose={onClose}>
       <h2 className="mb-4 text-lg font-bold text-zinc-800">장소 추가</h2>
+
+      {/* Naver place search */}
+      {searchEnabled && (
+        <div className="mb-4 rounded-2xl bg-blush-50/60 p-3">
+          <form onSubmit={runSearch} className="flex gap-2">
+            <input
+              className="input"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="🔍 네이버로 장소 검색 (예: 연남동 카페)"
+            />
+            <button
+              type="submit"
+              disabled={searching}
+              className="btn-primary shrink-0 px-4 py-2"
+            >
+              {searching ? "…" : "검색"}
+            </button>
+          </form>
+          {searchError && (
+            <p className="mt-2 text-sm text-red-500">{searchError}</p>
+          )}
+          {results && (
+            <div className="mt-2 space-y-1.5">
+              {results.length === 0 && (
+                <p className="text-sm text-zinc-400">검색 결과가 없어요</p>
+              )}
+              {results.map((r, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => pick(r)}
+                  className="block w-full rounded-xl bg-white px-3 py-2 text-left ring-1 ring-blush-50 hover:ring-blush-200"
+                >
+                  <div className="text-sm font-semibold text-zinc-800">
+                    {categoryEmoji[r.category as PlaceCategory]} {r.name}
+                  </div>
+                  <div className="truncate text-xs text-zinc-400">
+                    {r.address}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+          <p className="mt-2 text-[11px] text-zinc-400">
+            검색 결과를 선택하면 아래 항목이 자동으로 채워지고 지도에 표시돼요.
+          </p>
+        </div>
+      )}
+
       <form onSubmit={submit} className="space-y-4">
         <div>
           <label className="label">장소 이름</label>
@@ -52,7 +142,6 @@ export function AddPlaceModal({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="예) 연남동 감성 카페"
-            autoFocus
           />
         </div>
 
@@ -96,6 +185,11 @@ export function AddPlaceModal({
           />
         </div>
 
+        {coords.lat != null && coords.lng != null && (
+          <p className="text-xs text-emerald-600">
+            📍 좌표 저장됨 · 지도에 표시됩니다
+          </p>
+        )}
         {error && <p className="text-sm text-red-500">{error}</p>}
 
         <div className="flex gap-2 pt-1">

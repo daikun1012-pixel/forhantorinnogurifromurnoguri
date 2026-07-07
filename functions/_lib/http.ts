@@ -53,6 +53,15 @@ export function bool(obj: Record<string, unknown>, key: string): boolean {
   return obj[key] === true;
 }
 
+export function numOrNull(
+  obj: Record<string, unknown>,
+  key: string,
+): number | null {
+  const v = obj[key];
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  return null;
+}
+
 export function oneOf<T extends string>(
   obj: Record<string, unknown>,
   key: string,
