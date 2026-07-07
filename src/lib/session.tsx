@@ -1,0 +1,72 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import { api, getStoredUserId, setStoredUserId } from "@/lib/api";
+import type { SessionInfo } from "@/types";
+
+interface SessionState {
+  loading: boolean;
+  session: SessionInfo | null;
+  login: (name: string) => Promise<void>;
+  logout: () => void;
+  refresh: () => Promise<void>;
+}
+
+const SessionContext = createContext<SessionState | null>(null);
+
+export function SessionProvider({ children }: { children: ReactNode }) {
+  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState<SessionInfo | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!getStoredUserId()) {
+      setSession(null);
+      return;
+    }
+    try {
+      setSession(await api.me());
+    } catch {
+      setStoredUserId(null);
+      setSession(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh().finally(() => setLoading(false));
+  }, [refresh]);
+
+  const login = useCallback(
+    async (name: string) => {
+      const user = await api.login(name);
+      setStoredUserId(user.id);
+      await refresh();
+    },
+    [refresh],
+  );
+
+  const logout = useCallback(() => {
+    setStoredUserId(null);
+    setSession(null);
+  }, []);
+
+  const value = useMemo<SessionState>(
+    () => ({ loading, session, login, logout, refresh }),
+    [loading, session, login, logout, refresh],
+  );
+
+  return (
+    <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+  );
+}
+
+export function useSession(): SessionState {
+  const ctx = useContext(SessionContext);
+  if (!ctx) throw new Error("useSession must be used within SessionProvider");
+  return ctx;
+}

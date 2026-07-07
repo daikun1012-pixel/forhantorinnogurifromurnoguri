@@ -1,15 +1,19 @@
-// Map snake_case D1 rows to the camelCase shapes in src/types/index.ts.
-
 import type {
+  Couple,
+  CoupleMember,
   Place,
   PlaceComment,
   PlaceReaction,
+  User,
 } from "../../src/types";
 
-export const PLACE_CATEGORIES = [
+type Row = Record<string, unknown>;
+
+export const CATEGORIES = [
   "cafe",
   "restaurant",
-  "activity",
+  "exhibition",
+  "walk",
   "travel",
   "shopping",
   "etc",
@@ -17,24 +21,54 @@ export const PLACE_CATEGORIES = [
 
 export const PRIORITIES = ["low", "medium", "high"] as const;
 
-export function rowToPlace(r: Record<string, unknown>): Place {
+export function toUser(r: Row): User {
+  return {
+    id: String(r.id),
+    name: String(r.name),
+    avatarColor: String(r.avatar_color),
+    createdAt: String(r.created_at),
+  };
+}
+
+export function toCouple(r: Row): Couple {
+  return {
+    id: String(r.id),
+    name: String(r.name),
+    inviteCode: String(r.invite_code),
+    createdAt: String(r.created_at),
+  };
+}
+
+export function toMember(r: Row): CoupleMember {
+  return {
+    coupleId: String(r.couple_id),
+    userId: String(r.user_id),
+    role: r.role as CoupleMember["role"],
+    joinedAt: String(r.joined_at),
+    user: {
+      id: String(r.user_id),
+      name: String(r.name),
+      avatarColor: String(r.avatar_color),
+      createdAt: String(r.user_created_at),
+    },
+  };
+}
+
+export function toPlace(r: Row): Place {
   return {
     id: String(r.id),
     coupleId: String(r.couple_id),
     name: String(r.name),
     category: r.category as Place["category"],
-    address: String(r.address),
-    roadAddress: String(r.road_address),
-    latitude: Number(r.latitude),
-    longitude: Number(r.longitude),
-    sourceUrl: String(r.source_url ?? ""),
+    address: String(r.address ?? ""),
+    mapUrl: String(r.map_url ?? ""),
     createdBy: String(r.created_by),
     createdAt: String(r.created_at),
     updatedAt: String(r.updated_at),
   };
 }
 
-export function rowToReaction(r: Record<string, unknown>): PlaceReaction {
+export function toReaction(r: Row): PlaceReaction {
   return {
     id: String(r.id),
     placeId: String(r.place_id),
@@ -48,7 +82,7 @@ export function rowToReaction(r: Record<string, unknown>): PlaceReaction {
   };
 }
 
-export function rowToComment(r: Record<string, unknown>): PlaceComment {
+export function toComment(r: Row): PlaceComment {
   return {
     id: String(r.id),
     placeId: String(r.place_id),

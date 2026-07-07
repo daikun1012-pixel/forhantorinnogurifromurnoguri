@@ -1,54 +1,67 @@
 import type { Env } from "../../types";
-import { CURRENT_COUPLE_ID, CURRENT_USER_ID } from "../../_lib/auth";
-import {
-  handle,
-  readJson,
-  requireEnum,
-  requireNumber,
-  requireString,
-  optionalString,
-  success,
-} from "../../_lib/http";
-import { PLACE_CATEGORIES, rowToPlace } from "../../_lib/mappers";
+import { newId } from "../../_lib/db";
+import { handle, oneOf, readJson, str, success } from "../../_lib/http";
+import { requireCouple, requireUser } from "../../_lib/session";
+import { CATEGORIES, toPlace, toReaction } from "../../_lib/mappers";
 
-// GET /api/places — list places for the current couple.
-export const onRequestGet: PagesFunction<Env> = ({ env }) =>
+// GET /api/places — couple's places, each with the couple's reactions.
+export const onRequestGet: PagesFunction<Env> = ({ env, request }) =>
   handle(async () => {
-    const { results } = await env.DB.prepare(
-      `SELECT * FROM places WHERE couple_id = ? ORDER BY created_at DESC`,
-    )
-      .bind(CURRENT_COUPLE_ID)
+    const ctx = await requireUser(env, request);
+    const coupleId = await requireCouple(ctx);
+
+    const places = await ctx.db
+      .prepare(`SELECT * FROM places WHERE couple_id = ? ORDER BY created_at DESC`)
+      .bind(coupleId)
       .all();
-    return success((results ?? []).map(rowToPlace));
+
+    const reactions = await ctx.db
+      .prepare(
+        `SELECT r.* FROM place_reactions r
+           JOIN places p ON p.id = r.place_id
+          WHERE p.couple_id = ?`,
+      )
+      .bind(coupleId)
+      .all();
+
+    const byPlace = new Map<string, ReturnType<typeof toReaction>[]>();
+    for (const row of reactions.results ?? []) {
+      const rx = toReaction(row);
+      const list = byPlace.get(rx.placeId) ?? [];
+      list.push(rx);
+      byPlace.set(rx.placeId, list);
+    }
+
+    const data = (places.results ?? []).map((row) => {
+      const place = toPlace(row);
+      return { ...place, reactions: byPlace.get(place.id) ?? [] };
+    });
+    return success(data);
   });
 
-// POST /api/places — create a place for the current couple.
+// POST /api/places — add a place to the couple's list.
 export const onRequestPost: PagesFunction<Env> = ({ env, request }) =>
   handle(async () => {
+    const ctx = await requireUser(env, request);
+    const coupleId = await requireCouple(ctx);
     const body = await readJson(request);
     const now = new Date().toISOString();
-    const id = crypto.randomUUID();
 
     const place = {
-      id,
-      couple_id: CURRENT_COUPLE_ID,
-      name: requireString(body, "name"),
-      category: requireEnum(body, "category", PLACE_CATEGORIES),
-      address: optionalString(body, "address"),
-      road_address: optionalString(body, "roadAddress"),
-      latitude: requireNumber(body, "latitude"),
-      longitude: requireNumber(body, "longitude"),
-      source_url: optionalString(body, "sourceUrl"),
-      created_by: CURRENT_USER_ID,
+      id: newId("place"),
+      couple_id: coupleId,
+      name: str(body, "name", { max: 120 }),
+      category: oneOf(body, "category", CATEGORIES, "etc"),
+      address: str(body, "address", { required: false, max: 300 }),
+      map_url: str(body, "mapUrl", { required: false, max: 500 }),
+      created_by: ctx.userId,
       created_at: now,
       updated_at: now,
     };
-
     await env.DB.prepare(
       `INSERT INTO places
-         (id, couple_id, name, category, address, road_address,
-          latitude, longitude, source_url, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, couple_id, name, category, address, map_url, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
         place.id,
@@ -56,15 +69,12 @@ export const onRequestPost: PagesFunction<Env> = ({ env, request }) =>
         place.name,
         place.category,
         place.address,
-        place.road_address,
-        place.latitude,
-        place.longitude,
-        place.source_url,
+        place.map_url,
         place.created_by,
         place.created_at,
         place.updated_at,
       )
       .run();
 
-    return success(rowToPlace(place), 201);
+    return success({ ...toPlace(place), reactions: [] }, 201);
   });

@@ -1,0 +1,98 @@
+import type {
+  Couple,
+  PlaceComment,
+  PlaceDetail,
+  PlaceReaction,
+  PlaceWithReactions,
+  SessionInfo,
+  User,
+} from "@/types";
+
+const USER_KEY = "cdw_user_id";
+
+export function getStoredUserId(): string | null {
+  return localStorage.getItem(USER_KEY);
+}
+export function setStoredUserId(id: string | null): void {
+  if (id) localStorage.setItem(USER_KEY, id);
+  else localStorage.removeItem(USER_KEY);
+}
+
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+async function req<T>(
+  path: string,
+  options: { method?: string; body?: unknown } = {},
+): Promise<T> {
+  const headers: Record<string, string> = {};
+  const userId = getStoredUserId();
+  if (userId) headers["X-User-Id"] = userId;
+  if (options.body !== undefined) headers["Content-Type"] = "application/json";
+
+  const res = await fetch(`/api${path}`, {
+    method: options.method ?? "GET",
+    headers,
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+  });
+
+  let json: { ok: boolean; data?: T; error?: string };
+  try {
+    json = await res.json();
+  } catch {
+    throw new ApiError("서버 응답을 읽을 수 없습니다", res.status);
+  }
+  if (!res.ok || !json.ok) {
+    throw new ApiError(json.error ?? "요청에 실패했습니다", res.status);
+  }
+  return json.data as T;
+}
+
+export const api = {
+  login: (name: string) =>
+    req<User>("/auth/login", { method: "POST", body: { name } }),
+  me: () => req<SessionInfo>("/me"),
+
+  createCouple: (name?: string) =>
+    req<Couple>("/couples", { method: "POST", body: { name } }),
+  joinCouple: (code: string) =>
+    req<Couple>("/couples/join", { method: "POST", body: { code } }),
+
+  listPlaces: () => req<PlaceWithReactions[]>("/places"),
+  createPlace: (input: {
+    name: string;
+    category: string;
+    address?: string;
+    mapUrl?: string;
+  }) => req<PlaceWithReactions>("/places", { method: "POST", body: input }),
+  getPlace: (id: string) => req<PlaceDetail>(`/places/${id}`),
+  deletePlace: (id: string) =>
+    req<{ id: string }>(`/places/${id}`, { method: "DELETE" }),
+
+  setReaction: (
+    placeId: string,
+    input: {
+      wantToGo: boolean;
+      visited: boolean;
+      priority: string;
+      memo: string;
+    },
+  ) =>
+    req<PlaceReaction>(`/places/${placeId}/reaction`, {
+      method: "PUT",
+      body: input,
+    }),
+
+  addComment: (placeId: string, body: string) =>
+    req<PlaceComment>(`/places/${placeId}/comments`, {
+      method: "POST",
+      body: { body },
+    }),
+  deleteComment: (commentId: string) =>
+    req<{ id: string }>(`/comments/${commentId}`, { method: "DELETE" }),
+};
