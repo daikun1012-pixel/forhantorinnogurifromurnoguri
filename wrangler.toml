@@ -8,5 +8,5 @@ pages_build_output_dir = "dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "couple-date-wishlist"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "c3b36880-b9ee-4316-aeab-43bda6683aa2"
 migrations_dir = "migrations"
