@@ -7,6 +7,8 @@ export interface Env {
   // Naver integration (set as Pages environment variables / secrets).
   // Public map client id (NCP Maps).
   NAVER_MAP_CLIENT_ID?: string;
+  // NCP Maps client secret — enables server-side address geocoding.
+  NAVER_MAP_CLIENT_SECRET?: string;
   // Script query-param name for the map key: "ncpClientId" (default) or
   // "ncpKeyId" depending on the key type issued by Naver Cloud Platform.
   NAVER_MAP_KEY_PARAM?: string;
