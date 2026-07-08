@@ -3,10 +3,12 @@ import { ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
 
 export function LoginPage() {
-  const { login } = useSession();
+  const { login, loginWithCode } = useSession();
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showRecover, setShowRecover] = useState(false);
+  const [code, setCode] = useState("");
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,6 +22,19 @@ export function LoginPage() {
       await login(name.trim());
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "로그인에 실패했습니다");
+      setBusy(false);
+    }
+  };
+
+  const recover = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!code.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await loginWithCode(code.trim());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "복구에 실패했습니다");
       setBusy(false);
     }
   };
@@ -53,9 +68,47 @@ export function LoginPage() {
         </button>
       </form>
 
+      <div className="mt-6 w-full">
+        {!showRecover ? (
+          <button
+            type="button"
+            onClick={() => {
+              setShowRecover(true);
+              setError(null);
+            }}
+            className="mx-auto block text-xs font-medium text-blush-400 underline"
+          >
+            이미 쓰던 계정이 있어요 · 복구 코드로 로그인
+          </button>
+        ) : (
+          <form onSubmit={recover} className="space-y-2">
+            <label className="label">복구 코드</label>
+            <div className="flex gap-2">
+              <input
+                className="input"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="user_xxxxxxxx"
+                autoFocus
+              />
+              <button type="submit" disabled={busy} className="btn-soft shrink-0">
+                로그인
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowRecover(false)}
+              className="text-xs text-zinc-400"
+            >
+              ← 새로 시작하기
+            </button>
+          </form>
+        )}
+      </div>
+
       <p className="mt-8 text-center text-[11px] text-zinc-300">
         복잡한 회원가입 없이 이름만으로 시작해요.<br />
-        같은 기기에서는 로그인 상태가 유지됩니다.
+        기기를 바꿔도 <b>복구 코드</b>로 이어서 쓸 수 있어요 (커플 탭에서 확인).
       </p>
     </div>
   );

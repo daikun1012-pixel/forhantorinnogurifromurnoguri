@@ -110,10 +110,15 @@ function CoupleOnboarding({
 }
 
 function CoupleSettings() {
-  const { session, logout } = useSession();
+  const { session, logout, refresh } = useSession();
   const [copied, setCopied] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
+  const [kicking, setKicking] = useState<string | null>(null);
+  const [confirmKick, setConfirmKick] = useState<string | null>(null);
   if (!session?.couple) return null;
-  const { couple, members } = session;
+  const { couple, members, user } = session;
+  const isOwner =
+    members.find((m) => m.userId === user.id)?.role === "owner";
 
   const copy = async () => {
     try {
@@ -123,6 +128,27 @@ function CoupleSettings() {
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  };
+
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(user.id);
+    } catch {
+      /* ignore */
+    }
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 1500);
+  };
+
+  const kick = async (userId: string) => {
+    setKicking(userId);
+    try {
+      await api.kickMember(userId);
+      setConfirmKick(null);
+      await refresh();
+    } finally {
+      setKicking(null);
+    }
   };
 
   return (
@@ -139,6 +165,15 @@ function CoupleSettings() {
               <span className="text-[11px] text-zinc-300">
                 {m.role === "owner" ? "개설자" : "파트너"}
               </span>
+              {isOwner && m.role !== "owner" && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmKick(m.userId)}
+                  className="mt-1 text-[11px] text-zinc-300 hover:text-red-400"
+                >
+                  내보내기
+                </button>
+              )}
             </div>
           ))}
           {members.length < 2 && (
@@ -167,6 +202,51 @@ function CoupleSettings() {
             ? "두 사람이 모두 참여했어요 💗"
             : "이 코드를 상대방에게 공유하면 같은 공간을 함께 쓸 수 있어요."}
         </p>
+      </section>
+
+      {confirmKick && (
+        <section className="card ring-1 ring-red-100">
+          <p className="text-sm text-zinc-600">
+            <b>
+              {members.find((m) => m.userId === confirmKick)?.user.name}
+            </b>
+            님을 커플 공간에서 내보낼까요? 이 사람의 반응·메모·댓글도 함께
+            삭제됩니다.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirmKick(null)}
+              className="btn-ghost flex-1"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={() => kick(confirmKick)}
+              disabled={kicking !== null}
+              className="btn flex-1 bg-red-500 text-white"
+            >
+              {kicking ? "내보내는 중…" : "내보내기"}
+            </button>
+          </div>
+        </section>
+      )}
+
+      <section className="card">
+        <h3 className="text-sm font-semibold text-zinc-500">내 복구 코드</h3>
+        <p className="mt-1 text-xs text-zinc-400">
+          기기를 바꾸거나 다른 브라우저에서 로그인 화면의 "복구 코드"에 이 값을
+          입력하면 지금 계정으로 이어서 쓸 수 있어요. 남에게 공유하지 마세요.
+        </p>
+        <div className="mt-2 flex items-center gap-2">
+          <code className="flex-1 overflow-x-auto rounded-2xl bg-zinc-50 px-3 py-2.5 text-xs text-zinc-600">
+            {user.id}
+          </code>
+          <button type="button" onClick={copyCode} className="btn-soft shrink-0">
+            {codeCopied ? "복사됨!" : "복사"}
+          </button>
+        </div>
       </section>
 
       <button

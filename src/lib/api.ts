@@ -78,6 +78,10 @@ export const api = {
     req<Couple>("/couples", { method: "POST", body: { name } }),
   joinCouple: (code: string) =>
     req<Couple>("/couples/join", { method: "POST", body: { code } }),
+  kickMember: (userId: string) =>
+    req<{ removed: string }>(`/couples/members/${userId}`, {
+      method: "DELETE",
+    }),
 
   getConfig: () => req<AppConfig>("/config"),
   search: (query: string) =>
