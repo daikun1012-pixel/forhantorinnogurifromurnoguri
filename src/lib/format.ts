@@ -42,14 +42,26 @@ export const categoryList: PlaceCategory[] = [
   "etc",
 ];
 
-/** Naver Map link that opens the place so the user can get directions. */
+/** Strip floor/unit details that break Naver place search (keeps the road/lot address). */
+function cleanAddressForSearch(address: string): string {
+  return address
+    .replace(/\s+(지하\s*\d*\s*층?|\d+\s*층|\d+\s*호|[Bb]\d+).*$/, "")
+    .trim();
+}
+
+/**
+ * Naver Map link that opens the place so the user can get directions.
+ * Searches by address alone (cleaned) — combining name + address returns
+ * "no matching place" — falling back to the name when there is no address.
+ */
 export function naverMapUrl(place: {
   name: string;
   address: string;
   latitude: number | null;
   longitude: number | null;
 }): string {
-  const query = [place.name, place.address].filter(Boolean).join(" ").trim();
+  const cleaned = place.address ? cleanAddressForSearch(place.address) : "";
+  const query = (cleaned || place.name).trim();
   const base = `https://map.naver.com/p/search/${encodeURIComponent(query)}`;
   if (place.latitude != null && place.longitude != null) {
     // Center the map on the exact coordinates when we have them.
