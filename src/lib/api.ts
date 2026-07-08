@@ -12,7 +12,6 @@ export interface AppConfig {
   naverMapClientId: string;
   naverMapKeyParam: string;
   searchEnabled: boolean;
-  geocodeEnabled: boolean;
 }
 
 export interface SearchResult {
@@ -84,8 +83,6 @@ export const api = {
   search: (query: string) =>
     req<SearchResult[]>(`/search?query=${encodeURIComponent(query)}`),
 
-  geocodeMissing: () =>
-    req<{ updated: number }>("/places/geocode-missing", { method: "POST" }),
   listPlaces: () => req<PlaceWithReactions[]>("/places"),
   createPlace: (input: {
     name: string;

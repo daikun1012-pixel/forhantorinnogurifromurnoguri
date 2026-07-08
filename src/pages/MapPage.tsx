@@ -20,7 +20,6 @@ export function MapPage() {
   const mapEl = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
-  const backfilledRef = useRef(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -34,17 +33,6 @@ export function MapPage() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  // Backfill coordinates for hand-added places (address but no lat/lng), once.
-  useEffect(() => {
-    if (backfilledRef.current || !config?.geocodeEnabled || !places) return;
-    const needs = places.some((p) => p.latitude == null && p.address);
-    if (!needs) return;
-    backfilledRef.current = true;
-    void api.geocodeMissing().then((r) => {
-      if (r.updated > 0) void load();
-    });
-  }, [config, places, load]);
 
   const hasKey = Boolean(config?.naverMapClientId);
   const located = (places ?? []).filter(
