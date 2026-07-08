@@ -185,10 +185,17 @@ export function AddPlaceModal({
           />
         </div>
 
-        {coords.lat != null && coords.lng != null && (
+        {coords.lat != null && coords.lng != null ? (
           <p className="text-xs text-emerald-600">
             📍 좌표 저장됨 · 지도에 표시됩니다
           </p>
+        ) : (
+          config?.geocodeEnabled &&
+          address.trim() && (
+            <p className="text-xs text-zinc-400">
+              📍 주소를 입력하면 저장 시 자동으로 지도에 표시돼요
+            </p>
+          )
         )}
         {error && <p className="text-sm text-red-500">{error}</p>}
 
