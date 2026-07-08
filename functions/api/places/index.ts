@@ -3,7 +3,6 @@ import { newId } from "../../_lib/db";
 import { handle, numOrNull, oneOf, readJson, str, success } from "../../_lib/http";
 import { requireCouple, requireUser } from "../../_lib/session";
 import { CATEGORIES, toPlace, toReaction } from "../../_lib/mappers";
-import { geocodeAddress } from "../../_lib/geocode";
 
 // GET /api/places — couple's places, each with the couple's reactions.
 export const onRequestGet: PagesFunction<Env> = ({ env, request }) =>
@@ -49,16 +48,8 @@ export const onRequestPost: PagesFunction<Env> = ({ env, request }) =>
     const now = new Date().toISOString();
 
     const address = str(body, "address", { required: false, max: 300 });
-    let latitude = numOrNull(body, "latitude");
-    let longitude = numOrNull(body, "longitude");
-    // No coordinates from search? Geocode the typed address if possible.
-    if ((latitude == null || longitude == null) && address) {
-      const geo = await geocodeAddress(env, address);
-      if (geo) {
-        latitude = geo.lat;
-        longitude = geo.lng;
-      }
-    }
+    const latitude = numOrNull(body, "latitude");
+    const longitude = numOrNull(body, "longitude");
 
     const place = {
       id: newId("place"),
