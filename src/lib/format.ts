@@ -42,6 +42,22 @@ export const categoryList: PlaceCategory[] = [
   "etc",
 ];
 
+/** Naver Map link that opens the place so the user can get directions. */
+export function naverMapUrl(place: {
+  name: string;
+  address: string;
+  latitude: number | null;
+  longitude: number | null;
+}): string {
+  const query = [place.name, place.address].filter(Boolean).join(" ").trim();
+  const base = `https://map.naver.com/p/search/${encodeURIComponent(query)}`;
+  if (place.latitude != null && place.longitude != null) {
+    // Center the map on the exact coordinates when we have them.
+    return `${base}?c=${place.longitude},${place.latitude},15,0,0,0,dh`;
+  }
+  return base;
+}
+
 export function formatDateTime(iso: string): string {
   const d = new Date(iso);
   return new Intl.DateTimeFormat("ko-KR", {

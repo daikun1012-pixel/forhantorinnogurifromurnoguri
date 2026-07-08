@@ -176,13 +176,16 @@ export function AddPlaceModal({
         </div>
 
         <div>
-          <label className="label">지도 링크 (선택)</label>
+          <label className="label">정보 링크 (사이트·블로그, 선택)</label>
           <input
             className="input"
             value={mapUrl}
             onChange={(e) => setMapUrl(e.target.value)}
-            placeholder="네이버/카카오 지도 링크"
+            placeholder="블로그·홈페이지 등 참고 링크"
           />
+          <p className="mt-1 text-[11px] text-zinc-400">
+            길찾기는 상세 화면의 "네이버 지도" 버튼으로 열 수 있어요.
+          </p>
         </div>
 
         {coords.lat != null && coords.lng != null && (
