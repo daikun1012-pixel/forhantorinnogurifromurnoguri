@@ -1,5 +1,6 @@
 import type {
   Couple,
+  Place,
   PlaceComment,
   PlaceDetail,
   PlaceReaction,
@@ -109,6 +110,15 @@ export const api = {
     longitude?: number | null;
   }) => req<PlaceWithReactions>("/places", { method: "POST", body: input }),
   getPlace: (id: string) => req<PlaceDetail>(`/places/${id}`),
+  updatePlace: (
+    id: string,
+    input: {
+      name?: string;
+      category?: string;
+      address?: string;
+      mapUrl?: string;
+    },
+  ) => req<Place>(`/places/${id}`, { method: "PATCH", body: input }),
   deletePlace: (id: string) =>
     req<{ id: string }>(`/places/${id}`, { method: "DELETE" }),
 
