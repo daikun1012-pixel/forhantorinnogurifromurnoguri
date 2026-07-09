@@ -1,7 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Avatar } from "@/components/ui";
+import {
+  disablePush,
+  enablePush,
+  getPushState,
+  type PushState,
+} from "@/lib/push";
 
 export function CouplePage() {
   const { session, refresh, logout } = useSession();
@@ -233,6 +239,8 @@ function CoupleSettings() {
         </section>
       )}
 
+      <NotificationSection />
+
       <section className="card">
         <h3 className="text-sm font-semibold text-zinc-500">내 복구 코드</h3>
         <p className="mt-1 text-xs text-zinc-400">
@@ -257,5 +265,86 @@ function CoupleSettings() {
         로그아웃
       </button>
     </div>
+  );
+}
+
+function NotificationSection() {
+  const { config } = useSession();
+  const [state, setState] = useState<PushState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void getPushState().then(setState);
+  }, []);
+
+  if (config && !config.pushEnabled) return null; // push not configured on server
+
+  const enable = async () => {
+    if (!config?.vapidPublicKey) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await enablePush(config.vapidPublicKey);
+      setState(await getPushState());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "알림을 켜지 못했어요");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const disable = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await disablePush();
+      setState(await getPushState());
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="card">
+      <h3 className="text-sm font-semibold text-zinc-500">알림</h3>
+      <p className="mt-1 text-xs text-zinc-400">
+        상대가 장소를 추가하거나 반응·댓글을 남기면 알려드려요.
+      </p>
+
+      {state === "unsupported" ? (
+        <p className="mt-3 text-xs text-zinc-400">
+          이 브라우저는 알림을 지원하지 않아요. 아이폰은 홈 화면에 추가한 뒤
+          앱으로 열어야 알림을 켤 수 있어요.
+        </p>
+      ) : state === "denied" ? (
+        <p className="mt-3 text-xs text-red-400">
+          알림이 차단되어 있어요. 기기 설정에서 이 앱의 알림을 허용해 주세요.
+        </p>
+      ) : state === "on" ? (
+        <button
+          type="button"
+          onClick={disable}
+          disabled={busy}
+          className="btn-ghost mt-3 w-full"
+        >
+          {busy ? "처리 중…" : "🔔 알림 끄기"}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={enable}
+          disabled={busy}
+          className="btn-primary mt-3 w-full"
+        >
+          {busy ? "처리 중…" : "🔔 알림 켜기"}
+        </button>
+      )}
+
+      {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
+      <p className="mt-2 text-[11px] text-zinc-300">
+        아이폰: 홈 화면에 추가한 앱에서 열어야 알림이 동작해요 (iOS 16.4+).
+      </p>
+    </section>
   );
 }

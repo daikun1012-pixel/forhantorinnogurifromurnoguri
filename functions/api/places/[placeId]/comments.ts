@@ -4,13 +4,19 @@ import { newId } from "../../../_lib/db";
 import { requireCouple, requireUser } from "../../../_lib/session";
 import type { Ctx } from "../../../_lib/session";
 import { toComment } from "../../../_lib/mappers";
+import { notifyPartner, userName } from "../../../_lib/notify";
 
-async function assertPlace(ctx: Ctx, coupleId: string, placeId: string) {
+async function assertPlace(
+  ctx: Ctx,
+  coupleId: string,
+  placeId: string,
+): Promise<string> {
   const place = await ctx.db
-    .prepare(`SELECT id FROM places WHERE id = ? AND couple_id = ?`)
+    .prepare(`SELECT name FROM places WHERE id = ? AND couple_id = ?`)
     .bind(placeId, coupleId)
-    .first();
+    .first<{ name: string }>();
   if (!place) throw new HttpError("장소를 찾을 수 없습니다", 404);
+  return place.name;
 }
 
 // GET /api/places/:placeId/comments
@@ -30,12 +36,17 @@ export const onRequestGet: PagesFunction<Env> = ({ env, request, params }) =>
   });
 
 // POST /api/places/:placeId/comments { body }
-export const onRequestPost: PagesFunction<Env> = ({ env, request, params }) =>
+export const onRequestPost: PagesFunction<Env> = ({
+  env,
+  request,
+  params,
+  waitUntil,
+}) =>
   handle(async () => {
     const ctx = await requireUser(env, request);
     const coupleId = await requireCouple(ctx);
     const placeId = String(params.placeId);
-    await assertPlace(ctx, coupleId, placeId);
+    const placeName = await assertPlace(ctx, coupleId, placeId);
     const body = await readJson(request);
     const comment = {
       id: newId("cmt"),
@@ -56,5 +67,16 @@ export const onRequestPost: PagesFunction<Env> = ({ env, request, params }) =>
         comment.created_at,
       )
       .run();
+
+    waitUntil(
+      userName(env, ctx.userId).then((name) =>
+        notifyPartner(env, coupleId, ctx.userId, {
+          title: "💬 새 댓글",
+          body: `${name} · '${placeName}': ${comment.body}`,
+          url: "/places",
+        }),
+      ),
+    );
+
     return success(toComment(comment), 201);
   });

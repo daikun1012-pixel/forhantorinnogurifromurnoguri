@@ -11,18 +11,24 @@ import {
 import { newId } from "../../../_lib/db";
 import { requireCouple, requireUser } from "../../../_lib/session";
 import { PRIORITIES, toReaction } from "../../../_lib/mappers";
+import { notifyPartner, userName } from "../../../_lib/notify";
 
 // PUT /api/places/:placeId/reaction — upsert the current user's reaction.
-export const onRequestPut: PagesFunction<Env> = ({ env, request, params }) =>
+export const onRequestPut: PagesFunction<Env> = ({
+  env,
+  request,
+  params,
+  waitUntil,
+}) =>
   handle(async () => {
     const ctx = await requireUser(env, request);
     const coupleId = await requireCouple(ctx);
     const placeId = String(params.placeId);
 
     const place = await ctx.db
-      .prepare(`SELECT id FROM places WHERE id = ? AND couple_id = ?`)
+      .prepare(`SELECT name FROM places WHERE id = ? AND couple_id = ?`)
       .bind(placeId, coupleId)
-      .first();
+      .first<{ name: string }>();
     if (!place) throw new HttpError("장소를 찾을 수 없습니다", 404);
 
     const body = await readJson(request);
@@ -60,5 +66,18 @@ export const onRequestPut: PagesFunction<Env> = ({ env, request, params }) =>
       .prepare(`SELECT * FROM place_reactions WHERE place_id = ? AND user_id = ?`)
       .bind(placeId, ctx.userId)
       .first<Record<string, unknown>>();
+
+    waitUntil(
+      userName(env, ctx.userId).then((name) =>
+        notifyPartner(env, coupleId, ctx.userId, {
+          title: wantToGo ? "💖 반응 도착" : "반응 도착",
+          body: `${name}님이 '${place.name}'에 ${
+            wantToGo ? "가고 싶어 해요" : "반응을 남겼어요"
+          }`,
+          url: "/places",
+        }),
+      ),
+    );
+
     return success(toReaction(row!));
   });

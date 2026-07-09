@@ -15,4 +15,9 @@ export interface Env {
   // Local Search API credentials (Naver Developers). Secret.
   NAVER_SEARCH_CLIENT_ID?: string;
   NAVER_SEARCH_CLIENT_SECRET?: string;
+
+  // Web Push (VAPID). Public key is exposed to the client; private is secret.
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_SUBJECT?: string; // e.g. "mailto:you@example.com"
 }
