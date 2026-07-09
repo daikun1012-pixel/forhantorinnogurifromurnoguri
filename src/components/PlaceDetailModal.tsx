@@ -3,6 +3,7 @@ import { api, ApiError } from "@/lib/api";
 import {
   categoryEmoji,
   categoryLabels,
+  categoryList,
   formatDateTime,
   naverMapUrl,
   priorityClasses,
@@ -10,6 +11,7 @@ import {
 } from "@/lib/format";
 import type {
   CoupleMember,
+  PlaceCategory,
   PlaceComment,
   PlaceDetail,
   PlaceReaction,
@@ -99,6 +101,21 @@ function DetailBody({
   const partnerReactions = detail.reactions.filter(
     (r) => r.userId !== currentUserId,
   );
+  const [editing, setEditing] = useState(false);
+
+  if (editing) {
+    return (
+      <EditPlaceForm
+        detail={detail}
+        onCancel={() => setEditing(false)}
+        onSaved={async () => {
+          setEditing(false);
+          await reload();
+          onChanged();
+        }}
+      />
+    );
+  }
 
   return (
     <div>
@@ -141,6 +158,13 @@ function DetailBody({
             🔗 정보 링크
           </a>
         )}
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="btn-soft px-3 py-2 text-sm"
+        >
+          ✏️ 정보 수정
+        </button>
       </div>
 
       {/* Partner reaction */}
@@ -470,6 +494,108 @@ function DeletePlace({
           이 장소 삭제
         </button>
       )}
+    </div>
+  );
+}
+
+function EditPlaceForm({
+  detail,
+  onCancel,
+  onSaved,
+}: {
+  detail: PlaceDetail;
+  onCancel: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const [name, setName] = useState(detail.name);
+  const [category, setCategory] = useState<PlaceCategory>(detail.category);
+  const [address, setAddress] = useState(detail.address);
+  const [mapUrl, setMapUrl] = useState(detail.mapUrl);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      setError("장소 이름을 입력해 주세요");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await api.updatePlace(detail.id, {
+        name: name.trim(),
+        category,
+        address: address.trim(),
+        mapUrl: mapUrl.trim(),
+      });
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "저장에 실패했습니다");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      <h2 className="mb-4 text-lg font-bold text-zinc-800">장소 정보 수정</h2>
+      <form onSubmit={save} className="space-y-4">
+        <div>
+          <label className="label">장소 이름</label>
+          <input
+            className="input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoFocus
+          />
+        </div>
+        <div>
+          <label className="label">카테고리</label>
+          <div className="flex flex-wrap gap-2">
+            {categoryList.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCategory(c)}
+                className={`chip ring-1 ${
+                  category === c
+                    ? "bg-blush-400 text-white ring-blush-400"
+                    : "bg-white text-zinc-500 ring-blush-100"
+                }`}
+              >
+                {categoryEmoji[c]} {categoryLabels[c]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label className="label">주소</label>
+          <input
+            className="input"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="예) 서울 마포구 연남동"
+          />
+        </div>
+        <div>
+          <label className="label">정보 링크 (사이트·블로그)</label>
+          <input
+            className="input"
+            value={mapUrl}
+            onChange={(e) => setMapUrl(e.target.value)}
+            placeholder="블로그·홈페이지 등 참고 링크"
+          />
+        </div>
+        {error && <p className="text-sm text-red-500">{error}</p>}
+        <div className="flex gap-2 pt-1">
+          <button type="button" onClick={onCancel} className="btn-ghost flex-1">
+            취소
+          </button>
+          <button type="submit" disabled={saving} className="btn-primary flex-1">
+            {saving ? "저장 중…" : "저장"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

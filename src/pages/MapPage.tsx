@@ -2,10 +2,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { loadNaverMaps } from "@/lib/naver";
-import { categoryEmoji } from "@/lib/format";
+import { categoryEmoji, naverMapUrl } from "@/lib/format";
 import { PlaceDetailModal } from "@/components/PlaceDetailModal";
 import { EmptyState, ErrorState, Spinner } from "@/components/ui";
 import type { PlaceWithReactions } from "@/types";
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
 export function MapPage() {
   const { session, config } = useSession();
@@ -20,6 +28,7 @@ export function MapPage() {
   const mapEl = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const infoRef = useRef<any>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -65,13 +74,39 @@ export function MapPage() {
 
         markersRef.current.forEach((m) => m.setMap(null));
         markersRef.current = [];
+        if (!infoRef.current) {
+          infoRef.current = new naver.maps.InfoWindow({ content: "" });
+        }
 
         const bounds =
           located.length > 0 ? new naver.maps.LatLngBounds() : null;
         located.forEach((p) => {
           const pos = new naver.maps.LatLng(p.latitude, p.longitude);
           const marker = new naver.maps.Marker({ position: pos, map: mapRef.current });
-          naver.maps.Event.addListener(marker, "click", () => setOpenId(p.id));
+          naver.maps.Event.addListener(marker, "click", () => {
+            const url = naverMapUrl(p);
+            infoRef.current.setContent(
+              `<div style="padding:10px 12px;max-width:220px;font-size:13px;line-height:1.5">
+                 <div style="font-weight:700;color:#27272a;margin-bottom:6px">${escapeHtml(
+                   p.name,
+                 )}</div>
+                 <a href="${url}" target="_blank" rel="noreferrer" style="color:#f43f5e;font-weight:600;text-decoration:none">🗺️ 길찾기</a>
+                 <span style="color:#d4d4d8"> · </span>
+                 <a href="#" id="iw-detail-${p.id}" style="color:#71717a;text-decoration:none">상세</a>
+               </div>`,
+            );
+            infoRef.current.open(mapRef.current, marker);
+            setTimeout(() => {
+              const el = document.getElementById(`iw-detail-${p.id}`);
+              if (el) {
+                el.onclick = (e) => {
+                  e.preventDefault();
+                  infoRef.current.close();
+                  setOpenId(p.id);
+                };
+              }
+            }, 0);
+          });
           markersRef.current.push(marker);
           bounds?.extend(pos);
         });
