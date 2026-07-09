@@ -100,7 +100,7 @@ export function MapPage() {
       ) : (
         <div
           ref={mapEl}
-          className="h-72 w-full overflow-hidden rounded-3xl ring-1 ring-blush-100"
+          className="relative isolate h-72 w-full overflow-hidden rounded-3xl ring-1 ring-blush-100"
         />
       )}
 

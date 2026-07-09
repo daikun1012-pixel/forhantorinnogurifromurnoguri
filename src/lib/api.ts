@@ -12,6 +12,8 @@ export interface AppConfig {
   naverMapClientId: string;
   naverMapKeyParam: string;
   searchEnabled: boolean;
+  vapidPublicKey: string;
+  pushEnabled: boolean;
 }
 
 export interface SearchResult {
@@ -78,6 +80,20 @@ export const api = {
     req<Couple>("/couples", { method: "POST", body: { name } }),
   joinCouple: (code: string) =>
     req<Couple>("/couples/join", { method: "POST", body: { code } }),
+  kickMember: (userId: string) =>
+    req<{ removed: string }>(`/couples/members/${userId}`, {
+      method: "DELETE",
+    }),
+
+  pushSubscribe: (sub: {
+    endpoint: string;
+    keys: { p256dh: string; auth: string };
+  }) => req<{ subscribed: boolean }>("/push/subscribe", { method: "POST", body: sub }),
+  pushUnsubscribe: (endpoint: string) =>
+    req<{ unsubscribed: boolean }>("/push/unsubscribe", {
+      method: "POST",
+      body: { endpoint },
+    }),
 
   getConfig: () => req<AppConfig>("/config"),
   search: (query: string) =>

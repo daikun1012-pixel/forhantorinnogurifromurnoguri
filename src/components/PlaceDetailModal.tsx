@@ -4,6 +4,7 @@ import {
   categoryEmoji,
   categoryLabels,
   formatDateTime,
+  naverMapUrl,
   priorityClasses,
   priorityLabels,
 } from "@/lib/format";
@@ -121,16 +122,26 @@ function DetailBody({
         </button>
       </div>
 
-      {detail.mapUrl && (
+      <div className="mt-3 flex flex-wrap gap-2">
         <a
-          href={detail.mapUrl}
+          href={naverMapUrl(detail)}
           target="_blank"
           rel="noreferrer"
-          className="mt-3 inline-block text-sm font-medium text-blush-500 underline"
+          className="btn-primary px-3 py-2 text-sm"
         >
-          지도 링크 열기 ↗
+          🗺️ 네이버 지도 · 길찾기
         </a>
-      )}
+        {detail.mapUrl && (
+          <a
+            href={detail.mapUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-ghost px-3 py-2 text-sm"
+          >
+            🔗 정보 링크
+          </a>
+        )}
+      </div>
 
       {/* Partner reaction */}
       <section className="mt-5">

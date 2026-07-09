@@ -15,6 +15,7 @@ interface SessionState {
   session: SessionInfo | null;
   config: AppConfig | null;
   login: (name: string) => Promise<void>;
+  loginWithCode: (code: string) => Promise<void>;
   logout: () => void;
   refresh: () => Promise<void>;
 }
@@ -56,14 +57,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [refresh],
   );
 
+  const loginWithCode = useCallback(async (code: string) => {
+    setStoredUserId(code.trim());
+    try {
+      setSession(await api.me());
+    } catch {
+      setStoredUserId(null);
+      setSession(null);
+      throw new Error("복구 코드를 찾을 수 없어요");
+    }
+  }, []);
+
   const logout = useCallback(() => {
     setStoredUserId(null);
     setSession(null);
   }, []);
 
   const value = useMemo<SessionState>(
-    () => ({ loading, session, config, login, logout, refresh }),
-    [loading, session, config, login, logout, refresh],
+    () => ({ loading, session, config, login, loginWithCode, logout, refresh }),
+    [loading, session, config, login, loginWithCode, logout, refresh],
   );
 
   return (
