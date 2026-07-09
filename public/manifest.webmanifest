@@ -1,0 +1,18 @@
+{
+  "name": "우리 데이트 위시리스트",
+  "short_name": "우리데이트",
+  "description": "커플이 함께 가고 싶은 곳을 모으는 위시리스트",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fffaf6",
+  "theme_color": "#fb7185",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

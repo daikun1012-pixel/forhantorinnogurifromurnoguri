@@ -3,6 +3,7 @@ import { newId } from "../../_lib/db";
 import { handle, numOrNull, oneOf, readJson, str, success } from "../../_lib/http";
 import { requireCouple, requireUser } from "../../_lib/session";
 import { CATEGORIES, toPlace, toReaction } from "../../_lib/mappers";
+import { notifyPartner, userName } from "../../_lib/notify";
 
 // GET /api/places — couple's places, each with the couple's reactions.
 export const onRequestGet: PagesFunction<Env> = ({ env, request }) =>
@@ -40,7 +41,7 @@ export const onRequestGet: PagesFunction<Env> = ({ env, request }) =>
   });
 
 // POST /api/places — add a place to the couple's list.
-export const onRequestPost: PagesFunction<Env> = ({ env, request }) =>
+export const onRequestPost: PagesFunction<Env> = ({ env, request, waitUntil }) =>
   handle(async () => {
     const ctx = await requireUser(env, request);
     const coupleId = await requireCouple(ctx);
@@ -83,6 +84,16 @@ export const onRequestPost: PagesFunction<Env> = ({ env, request }) =>
         place.updated_at,
       )
       .run();
+
+    waitUntil(
+      userName(env, ctx.userId).then((name) =>
+        notifyPartner(env, coupleId, ctx.userId, {
+          title: "새 장소 💗",
+          body: `${name}님이 '${place.name}'을(를) 추가했어요`,
+          url: "/places",
+        }),
+      ),
+    );
 
     return success({ ...toPlace(place), reactions: [] }, 201);
   });
