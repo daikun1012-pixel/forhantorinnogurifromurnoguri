@@ -273,10 +273,33 @@ function NotificationSection() {
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [testMsg, setTestMsg] = useState<string | null>(null);
 
   useEffect(() => {
     void getPushState().then(setState);
   }, []);
+
+  const test = async () => {
+    setBusy(true);
+    setTestMsg("보내는 중…");
+    try {
+      const r = await api.pushTest();
+      if (r.subscriptions === 0) {
+        setTestMsg("구독 정보가 없어요. 알림을 껐다가 다시 켜주세요.");
+      } else {
+        const o = r.outcomes[0];
+        setTestMsg(
+          o.ok
+            ? `전송 성공 (status ${o.status}) — 잠시 후 알림이 와야 해요.`
+            : `전송 실패 (status ${o.status})${o.error ? `: ${o.error}` : ""}`,
+        );
+      }
+    } catch (err) {
+      setTestMsg(err instanceof Error ? err.message : "테스트 실패");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   if (config && !config.pushEnabled) return null; // push not configured on server
 
@@ -322,14 +345,27 @@ function NotificationSection() {
           알림이 차단되어 있어요. 기기 설정에서 이 앱의 알림을 허용해 주세요.
         </p>
       ) : state === "on" ? (
-        <button
-          type="button"
-          onClick={disable}
-          disabled={busy}
-          className="btn-ghost mt-3 w-full"
-        >
-          {busy ? "처리 중…" : "🔔 알림 끄기"}
-        </button>
+        <div className="mt-3 space-y-2">
+          <button
+            type="button"
+            onClick={test}
+            disabled={busy}
+            className="btn-primary w-full"
+          >
+            {busy ? "처리 중…" : "🔔 테스트 알림 보내기"}
+          </button>
+          <button
+            type="button"
+            onClick={disable}
+            disabled={busy}
+            className="btn-ghost w-full"
+          >
+            알림 끄기
+          </button>
+          {testMsg && (
+            <p className="text-xs text-zinc-500">{testMsg}</p>
+          )}
+        </div>
       ) : (
         <button
           type="button"
