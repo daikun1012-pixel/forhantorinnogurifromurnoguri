@@ -99,6 +99,12 @@ export const api = {
     req<{
       subscriptions: number;
       outcomes: { endpoint: string; status: number; ok: boolean; error?: string }[];
+      selfCheck: {
+        signatureValid: boolean;
+        subject: string;
+        publicKeyLength: number;
+        privateKeyLength: number;
+      };
     }>("/push/test", { method: "POST" }),
 
   getConfig: () => req<AppConfig>("/config"),

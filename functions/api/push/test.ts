@@ -1,7 +1,12 @@
 import type { Env } from "../../types";
 import { HttpError, handle, success } from "../../_lib/http";
 import { requireUser } from "../../_lib/session";
-import { pushConfigured, sendPush, type PushSubscription } from "../../_lib/push";
+import {
+  pushConfigured,
+  sendPush,
+  vapidSelfCheck,
+  type PushSubscription,
+} from "../../_lib/push";
 
 interface SubRow extends PushSubscription {
   id: string;
@@ -53,5 +58,6 @@ export const onRequestPost: PagesFunction<Env> = ({ env, request }) =>
       }
     }
 
-    return success({ subscriptions: subs.length, outcomes });
+    const selfCheck = await vapidSelfCheck(env);
+    return success({ subscriptions: subs.length, outcomes, selfCheck });
   });
