@@ -95,6 +95,11 @@ export const api = {
       method: "POST",
       body: { endpoint },
     }),
+  pushTest: () =>
+    req<{
+      subscriptions: number;
+      outcomes: { endpoint: string; status: number; ok: boolean; error?: string }[];
+    }>("/push/test", { method: "POST" }),
 
   getConfig: () => req<AppConfig>("/config"),
   search: (query: string) =>

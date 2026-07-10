@@ -170,6 +170,7 @@ export interface PushResult {
   ok: boolean;
   status: number;
   gone: boolean; // 404/410 => subscription should be removed
+  error?: string;
 }
 
 export async function sendPush(
@@ -189,9 +190,14 @@ export async function sendPush(
     },
     body,
   });
+  let error: string | undefined;
+  if (!res.ok) {
+    error = (await res.text().catch(() => "")).slice(0, 300) || undefined;
+  }
   return {
     ok: res.ok,
     status: res.status,
     gone: res.status === 404 || res.status === 410,
+    error,
   };
 }
