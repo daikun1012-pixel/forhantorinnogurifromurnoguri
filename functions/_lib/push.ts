@@ -122,15 +122,24 @@ async function encryptPayload(
 // Env values can arrive with stray whitespace from copy/paste; normalise them.
 const clean = (v: string | undefined): string => (v ?? "").trim();
 
+function vapidSubject(env: Env): string {
+  let sub = clean(env.VAPID_SUBJECT);
+  if (!sub) return "mailto:admin@example.com";
+  if (!/^(mailto:|https?:\/\/)/i.test(sub)) sub = `mailto:${sub}`;
+  return sub;
+}
+
 async function vapidToken(env: Env, endpoint: string): Promise<string> {
   const aud = new URL(endpoint).origin;
   const header = bytesToB64url(te(JSON.stringify({ typ: "JWT", alg: "ES256" })));
+  const now = Math.floor(Date.now() / 1000);
   const payload = bytesToB64url(
     te(
       JSON.stringify({
         aud,
-        exp: Math.floor(Date.now() / 1000) + 12 * 60 * 60,
-        sub: clean(env.VAPID_SUBJECT) || "mailto:admin@example.com",
+        exp: now + 12 * 60 * 60,
+        iat: now,
+        sub: vapidSubject(env),
       }),
     ),
   );
@@ -164,6 +173,42 @@ async function vapidToken(env: Env, endpoint: string): Promise<string> {
 
 export function pushConfigured(env: Env): boolean {
   return Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY);
+}
+
+/** Diagnose the VAPID config: does the built JWT verify against the public key? */
+export async function vapidSelfCheck(env: Env): Promise<{
+  signatureValid: boolean;
+  subject: string;
+  publicKeyLength: number;
+  privateKeyLength: number;
+}> {
+  const token = await vapidToken(env, "https://web.push.apple.com/");
+  const [h, p, s] = token.split(".");
+  const pub = b64urlToBytes(clean(env.VAPID_PUBLIC_KEY));
+  let signatureValid = false;
+  try {
+    const verifyKey = await crypto.subtle.importKey(
+      "raw",
+      pub,
+      { name: "ECDSA", namedCurve: "P-256" },
+      false,
+      ["verify"],
+    );
+    signatureValid = await crypto.subtle.verify(
+      { name: "ECDSA", hash: "SHA-256" },
+      verifyKey,
+      b64urlToBytes(s),
+      te(`${h}.${p}`),
+    );
+  } catch {
+    signatureValid = false;
+  }
+  return {
+    signatureValid,
+    subject: vapidSubject(env),
+    publicKeyLength: clean(env.VAPID_PUBLIC_KEY).length,
+    privateKeyLength: clean(env.VAPID_PRIVATE_KEY).length,
+  };
 }
 
 export interface PushResult {

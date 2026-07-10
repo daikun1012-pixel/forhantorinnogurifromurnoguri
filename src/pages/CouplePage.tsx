@@ -284,14 +284,19 @@ function NotificationSection() {
     setTestMsg("보내는 중…");
     try {
       const r = await api.pushTest();
+      const sc = r.selfCheck;
+      const scMsg = sc.signatureValid
+        ? `키 정상 · sub=${sc.subject}`
+        : `⚠️ VAPID 키 불일치 (private/public 안 맞음) · sub=${sc.subject}`;
       if (r.subscriptions === 0) {
-        setTestMsg("구독 정보가 없어요. 알림을 껐다가 다시 켜주세요.");
+        setTestMsg(`구독 정보가 없어요. 알림을 껐다가 다시 켜주세요.\n${scMsg}`);
       } else {
         const o = r.outcomes[0];
         setTestMsg(
-          o.ok
+          (o.ok
             ? `전송 성공 (status ${o.status}) — 잠시 후 알림이 와야 해요.`
-            : `전송 실패 (status ${o.status})${o.error ? `: ${o.error}` : ""}`,
+            : `전송 실패 (status ${o.status})${o.error ? `: ${o.error}` : ""}`) +
+            `\n${scMsg}`,
         );
       }
     } catch (err) {
@@ -363,7 +368,9 @@ function NotificationSection() {
             알림 끄기
           </button>
           {testMsg && (
-            <p className="text-xs text-zinc-500">{testMsg}</p>
+            <p className="whitespace-pre-line break-all text-xs text-zinc-500">
+              {testMsg}
+            </p>
           )}
         </div>
       ) : (
