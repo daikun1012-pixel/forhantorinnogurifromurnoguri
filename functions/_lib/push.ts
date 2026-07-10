@@ -119,6 +119,9 @@ async function encryptPayload(
   return concat(salt, rs, new Uint8Array([asPub.length]), asPub, ciphertext);
 }
 
+// Env values can arrive with stray whitespace from copy/paste; normalise them.
+const clean = (v: string | undefined): string => (v ?? "").trim();
+
 async function vapidToken(env: Env, endpoint: string): Promise<string> {
   const aud = new URL(endpoint).origin;
   const header = bytesToB64url(te(JSON.stringify({ typ: "JWT", alg: "ES256" })));
@@ -127,17 +130,17 @@ async function vapidToken(env: Env, endpoint: string): Promise<string> {
       JSON.stringify({
         aud,
         exp: Math.floor(Date.now() / 1000) + 12 * 60 * 60,
-        sub: env.VAPID_SUBJECT || "mailto:admin@example.com",
+        sub: clean(env.VAPID_SUBJECT) || "mailto:admin@example.com",
       }),
     ),
   );
   const signingInput = `${header}.${payload}`;
 
-  const pub = b64urlToBytes(env.VAPID_PUBLIC_KEY as string);
+  const pub = b64urlToBytes(clean(env.VAPID_PUBLIC_KEY));
   const jwk: JsonWebKey = {
     kty: "EC",
     crv: "P-256",
-    d: env.VAPID_PRIVATE_KEY,
+    d: clean(env.VAPID_PRIVATE_KEY),
     x: bytesToB64url(pub.slice(1, 33)),
     y: bytesToB64url(pub.slice(33, 65)),
     ext: true,
@@ -182,7 +185,7 @@ export async function sendPush(
       TTL: "2419200",
       "Content-Encoding": "aes128gcm",
       "Content-Type": "application/octet-stream",
-      Authorization: `vapid t=${token}, k=${env.VAPID_PUBLIC_KEY}`,
+      Authorization: `vapid t=${token}, k=${clean(env.VAPID_PUBLIC_KEY)}`,
     },
     body,
   });
