@@ -36,6 +36,27 @@ export function PlacesPage() {
     void load();
   }, [load]);
 
+  // Next-date candidates: both want to go, not visited yet.
+  const candidates = useMemo(() => {
+    if (!places || members.length < 2) return [];
+    const rank = { high: 0, medium: 1, low: 2 } as const;
+    return places
+      .filter((p) => {
+        const wanters = p.reactions
+          .filter((r) => r.wantToGo)
+          .map((r) => r.userId);
+        const bothWant = members.every((m) => wanters.includes(m.userId));
+        const visited =
+          p.reactions.length > 0 && p.reactions.every((r) => r.visited);
+        return bothWant && !visited;
+      })
+      .sort((a, b) => {
+        const top = (p: PlaceWithReactions) =>
+          Math.min(...p.reactions.map((r) => rank[r.priority]));
+        return top(a) - top(b);
+      });
+  }, [places, members]);
+
   const visible = useMemo(() => {
     if (!places) return [];
     return places.filter((p) => {
@@ -65,6 +86,46 @@ export function PlacesPage() {
           + 추가
         </button>
       </div>
+
+      {/* Next date candidates */}
+      {candidates.length > 0 && (
+        <div className="card mb-4 bg-gradient-to-r from-blush-50 to-white">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-zinc-700">
+                💞 다음 데이트 후보{" "}
+                <span className="text-blush-500">{candidates.length}</span>곳
+              </h2>
+              <p className="mt-0.5 text-xs text-zinc-400">
+                둘 다 가고 싶고 아직 안 가본 곳이에요
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                setOpenId(
+                  candidates[Math.floor(Math.random() * candidates.length)].id,
+                )
+              }
+              className="btn-primary shrink-0 px-3 py-2 text-sm"
+            >
+              🎲 오늘 여기 어때?
+            </button>
+          </div>
+          <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1">
+            {candidates.slice(0, 8).map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setOpenId(p.id)}
+                className="chip shrink-0 bg-white text-zinc-600 ring-1 ring-blush-100"
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="-mx-4 mb-2 flex gap-2 overflow-x-auto px-4 pb-1">
@@ -128,7 +189,12 @@ export function PlacesPage() {
         <AddPlaceModal
           onClose={() => setAdding(false)}
           onCreated={(place) =>
-            setPlaces((prev) => (prev ? [place, ...prev] : [place]))
+            setPlaces((prev) => {
+              if (!prev) return [place];
+              return prev.some((p) => p.id === place.id)
+                ? prev.map((p) => (p.id === place.id ? place : p))
+                : [place, ...prev];
+            })
           }
         />
       )}

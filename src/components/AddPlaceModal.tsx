@@ -24,6 +24,7 @@ export function AddPlaceModal({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dupMsg, setDupMsg] = useState<string | null>(null);
 
   // Naver search state.
   const [query, setQuery] = useState("");
@@ -73,6 +74,14 @@ export function AddPlaceModal({
         latitude: coords.lat,
         longitude: coords.lng,
       });
+      if (place.duplicate) {
+        setDupMsg(
+          "이미 등록된 곳이에요! 내 '가고 싶어'로 표시해 두 사람의 후보로 매칭했어요 💞",
+        );
+        onCreated(place);
+        setTimeout(onClose, 1600);
+        return;
+      }
       onCreated(place);
       onClose();
     } catch (err) {
@@ -194,6 +203,11 @@ export function AddPlaceModal({
           </p>
         )}
         {error && <p className="text-sm text-red-500">{error}</p>}
+        {dupMsg && (
+          <p className="rounded-2xl bg-blush-50 px-3 py-2 text-sm font-medium text-blush-500">
+            {dupMsg}
+          </p>
+        )}
 
         <div className="flex gap-2 pt-1">
           <button type="button" onClick={onClose} className="btn-ghost flex-1">
