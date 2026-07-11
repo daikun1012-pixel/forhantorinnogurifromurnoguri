@@ -119,7 +119,11 @@ export const api = {
     mapUrl?: string;
     latitude?: number | null;
     longitude?: number | null;
-  }) => req<PlaceWithReactions>("/places", { method: "POST", body: input }),
+  }) =>
+    req<PlaceWithReactions & { duplicate: boolean }>("/places", {
+      method: "POST",
+      body: input,
+    }),
   getPlace: (id: string) => req<PlaceDetail>(`/places/${id}`),
   updatePlace: (
     id: string,
