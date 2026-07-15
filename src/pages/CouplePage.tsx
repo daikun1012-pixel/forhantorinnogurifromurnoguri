@@ -8,6 +8,8 @@ import {
   getPushState,
   type PushState,
 } from "@/lib/push";
+import { ChangelogModal } from "@/components/WhatsNew";
+import { latestVersion } from "@/data/changelog";
 
 export function CouplePage() {
   const { session, refresh, logout } = useSession();
@@ -257,6 +259,8 @@ function CoupleSettings() {
         </div>
       </section>
 
+      <ChangelogSection />
+
       <button
         type="button"
         onClick={logout}
@@ -265,6 +269,30 @@ function CoupleSettings() {
         로그아웃
       </button>
     </div>
+  );
+}
+
+function ChangelogSection() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="card flex w-full items-center justify-between text-left"
+      >
+        <div>
+          <h3 className="text-sm font-semibold text-zinc-500">
+            🎁 업데이트 소식
+          </h3>
+          <p className="mt-0.5 text-xs text-zinc-400">
+            현재 버전 {latestVersion} · 새 기능을 확인해 보세요
+          </p>
+        </div>
+        <span className="text-blush-300">›</span>
+      </button>
+      {open && <ChangelogModal onClose={() => setOpen(false)} />}
+    </>
   );
 }
 
