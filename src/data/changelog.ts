@@ -10,6 +10,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "1.5",
+    date: "2026-07-15",
+    title: "지도 마커가 카테고리별로 보여요 🗺️",
+    items: [
+      "카페 ☕️ · 식당 🍽️ · 여행 ✈️ 등 카테고리마다 다른 마커",
+      "색상 테두리로 한눈에 구분",
+    ],
+  },
+  {
     version: "1.4",
     date: "2026-07-15",
     title: "업데이트 소식 창이 생겼어요",
