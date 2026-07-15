@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useSession } from "@/lib/session";
 import { Avatar } from "@/components/ui";
+import { WhatsNewPopup } from "@/components/WhatsNew";
 
 const tabs = [
   { to: "/places", label: "위시리스트", icon: "📋" },
@@ -29,6 +30,8 @@ export function AppLayout() {
       <main className="flex-1 px-4 py-4 pb-24">
         <Outlet />
       </main>
+
+      <WhatsNewPopup />
 
       <nav className="fixed inset-x-0 bottom-0 z-10 mx-auto max-w-md border-t border-blush-50 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
         <div className="grid grid-cols-3">
