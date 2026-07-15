@@ -5,6 +5,7 @@ import { LoginPage } from "@/pages/LoginPage";
 import { CouplePage } from "@/pages/CouplePage";
 import { PlacesPage } from "@/pages/PlacesPage";
 import { MapPage } from "@/pages/MapPage";
+import { MemoriesPage } from "@/pages/MemoriesPage";
 import { Spinner } from "@/components/ui";
 
 export default function App() {
@@ -44,6 +45,7 @@ export default function App() {
       <Route element={<AppLayout />}>
         <Route path="/places" element={<PlacesPage />} />
         <Route path="/map" element={<MapPage />} />
+        <Route path="/memories" element={<MemoriesPage />} />
         <Route path="/couple" element={<CouplePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/places" replace />} />

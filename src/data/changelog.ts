@@ -10,6 +10,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "1.6",
+    date: "2026-07-15",
+    title: "우리의 추억이 쌓여요 📖",
+    items: [
+      "새 '추억' 탭 — 다녀온 곳의 기록을 타임라인으로",
+      "장소 상세에서 방문 날짜 + 한줄 후기 남기기",
+      "기록을 남기면 자동으로 '다녀옴' 표시",
+    ],
+  },
+  {
     version: "1.5",
     date: "2026-07-15",
     title: "지도 마커가 카테고리별로 보여요 🗺️",

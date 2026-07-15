@@ -199,6 +199,17 @@ function DetailBody({
         />
       </section>
 
+      {/* Visits */}
+      <VisitsSection
+        detail={detail}
+        currentUserId={currentUserId}
+        memberName={memberName}
+        reload={async () => {
+          await reload();
+          onChanged();
+        }}
+      />
+
       {/* Comments */}
       <CommentsSection
         detail={detail}
@@ -597,5 +608,132 @@ function EditPlaceForm({
         </div>
       </form>
     </div>
+  );
+}
+
+function VisitsSection({
+  detail,
+  currentUserId,
+  memberName,
+  reload,
+}: {
+  detail: PlaceDetail;
+  currentUserId: string;
+  memberName: (id: string) => string;
+  reload: () => Promise<void>;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [visitedAt, setVisitedAt] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await api.addVisit(detail.id, { visitedAt, note: note.trim() });
+      setAdding(false);
+      setNote("");
+      await reload();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "저장 실패");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="mt-5">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-zinc-500">방문 기록</h3>
+        {!adding && (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="chip bg-blush-50 text-blush-500"
+          >
+            + 기록 남기기
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <form onSubmit={save} className="card mb-2 space-y-2">
+          <input
+            type="date"
+            className="input"
+            value={visitedAt}
+            max={new Date().toISOString().slice(0, 10)}
+            onChange={(e) => setVisitedAt(e.target.value)}
+          />
+          <textarea
+            className="input min-h-[64px] resize-none"
+            placeholder="한 줄 후기 (예: 분위기 최고, 다음엔 평일에!)"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+          {error && <p className="text-sm text-red-500">{error}</p>}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setAdding(false)}
+              className="btn-ghost flex-1 py-2"
+            >
+              취소
+            </button>
+            <button
+              type="submit"
+              disabled={busy}
+              className="btn-primary flex-1 py-2"
+            >
+              {busy ? "저장 중…" : "저장"}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {detail.visits.length === 0 && !adding ? (
+        <p className="rounded-2xl bg-white px-3 py-3 text-sm text-zinc-300 ring-1 ring-blush-50">
+          아직 방문 기록이 없어요
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {detail.visits.map((v) => (
+            <div
+              key={v.id}
+              className="rounded-2xl bg-white px-3 py-2.5 ring-1 ring-blush-50"
+            >
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-xs font-semibold text-blush-400">
+                  📖 {v.visitedAt}
+                </span>
+                <span className="text-[11px] text-zinc-300">
+                  {memberName(v.createdBy)}
+                  {v.createdBy === currentUserId && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await api.deleteVisit(v.id);
+                        await reload();
+                      }}
+                      className="ml-2 text-zinc-300 hover:text-red-400"
+                    >
+                      삭제
+                    </button>
+                  )}
+                </span>
+              </div>
+              {v.note && (
+                <p className="mt-1 text-sm text-zinc-600">{v.note}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

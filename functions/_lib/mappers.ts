@@ -84,6 +84,18 @@ export function toReaction(r: Row): PlaceReaction {
   };
 }
 
+export function toVisit(r: Row) {
+  return {
+    id: String(r.id),
+    coupleId: String(r.couple_id),
+    placeId: String(r.place_id),
+    visitedAt: String(r.visited_at),
+    note: String(r.note ?? ""),
+    createdBy: String(r.created_by),
+    createdAt: String(r.created_at),
+  };
+}
+
 export function toComment(r: Row): PlaceComment {
   return {
     id: String(r.id),

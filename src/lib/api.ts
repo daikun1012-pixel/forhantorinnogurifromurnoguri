@@ -7,6 +7,8 @@ import type {
   PlaceWithReactions,
   SessionInfo,
   User,
+  Visit,
+  VisitWithPlace,
 } from "@/types";
 
 export interface AppConfig {
@@ -150,6 +152,12 @@ export const api = {
       method: "PUT",
       body: input,
     }),
+
+  listVisits: () => req<VisitWithPlace[]>("/visits"),
+  addVisit: (placeId: string, input: { visitedAt: string; note: string }) =>
+    req<Visit>(`/places/${placeId}/visits`, { method: "POST", body: input }),
+  deleteVisit: (visitId: string) =>
+    req<{ id: string }>(`/visits/${visitId}`, { method: "DELETE" }),
 
   addComment: (placeId: string, body: string) =>
     req<PlaceComment>(`/places/${placeId}/comments`, {

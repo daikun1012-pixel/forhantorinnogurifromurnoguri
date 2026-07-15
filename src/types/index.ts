@@ -70,9 +70,27 @@ export interface PlaceWithReactions extends Place {
   reactions: PlaceReaction[];
 }
 
+export interface Visit {
+  id: string;
+  coupleId: string;
+  placeId: string;
+  visitedAt: string; // YYYY-MM-DD
+  note: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+/** A visit joined with its place info (for the memories timeline). */
+export interface VisitWithPlace extends Visit {
+  placeName: string;
+  placeCategory: PlaceCategory;
+  placeAddress: string;
+}
+
 export interface PlaceDetail extends Place {
   reactions: PlaceReaction[];
   comments: PlaceComment[];
+  visits: Visit[];
 }
 
 /** Current session: the logged-in user and their couple (if any). */
