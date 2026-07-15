@@ -7,6 +7,16 @@ import { PlaceDetailModal } from "@/components/PlaceDetailModal";
 import { EmptyState, ErrorState, Spinner } from "@/components/ui";
 import type { PlaceWithReactions } from "@/types";
 
+const CATEGORY_COLORS: Record<string, string> = {
+  cafe: "#a16207",
+  restaurant: "#f97316",
+  exhibition: "#8b5cf6",
+  walk: "#22c55e",
+  travel: "#3b82f6",
+  shopping: "#ec4899",
+  etc: "#fb7185",
+};
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -82,7 +92,24 @@ export function MapPage() {
           located.length > 0 ? new naver.maps.LatLngBounds() : null;
         located.forEach((p) => {
           const pos = new naver.maps.LatLng(p.latitude, p.longitude);
-          const marker = new naver.maps.Marker({ position: pos, map: mapRef.current });
+          const marker = new naver.maps.Marker({
+            position: pos,
+            map: mapRef.current,
+            title: p.name,
+            icon: {
+              content: `<div style="display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.25))">
+                  <div style="width:34px;height:34px;border-radius:50%;background:#fff;border:2.5px solid ${
+                    CATEGORY_COLORS[p.category] ?? "#fb7185"
+                  };display:flex;align-items:center;justify-content:center;font-size:17px">${
+                    categoryEmoji[p.category]
+                  }</div>
+                  <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid ${
+                    CATEGORY_COLORS[p.category] ?? "#fb7185"
+                  };margin-top:-1px"></div>
+                </div>`,
+              anchor: new naver.maps.Point(17, 42),
+            },
+          });
           naver.maps.Event.addListener(marker, "click", () => {
             const url = naverMapUrl(p);
             infoRef.current.setContent(
