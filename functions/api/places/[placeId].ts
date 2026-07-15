@@ -14,6 +14,7 @@ import {
   toComment,
   toPlace,
   toReaction,
+  toVisit,
 } from "../../_lib/mappers";
 
 async function loadPlace(ctx: Ctx, coupleId: string, placeId: string) {
@@ -33,7 +34,7 @@ export const onRequestGet: PagesFunction<Env> = ({ env, request, params }) =>
     const placeId = String(params.placeId);
     const place = await loadPlace(ctx, coupleId, placeId);
 
-    const [reactions, comments] = await Promise.all([
+    const [reactions, comments, visits] = await Promise.all([
       ctx.db
         .prepare(`SELECT * FROM place_reactions WHERE place_id = ?`)
         .bind(placeId)
@@ -44,12 +45,19 @@ export const onRequestGet: PagesFunction<Env> = ({ env, request, params }) =>
         )
         .bind(placeId)
         .all(),
+      ctx.db
+        .prepare(
+          `SELECT * FROM visits WHERE place_id = ? ORDER BY visited_at DESC`,
+        )
+        .bind(placeId)
+        .all(),
     ]);
 
     return success({
       ...toPlace(place),
       reactions: (reactions.results ?? []).map(toReaction),
       comments: (comments.results ?? []).map(toComment),
+      visits: (visits.results ?? []).map(toVisit),
     });
   });
 
