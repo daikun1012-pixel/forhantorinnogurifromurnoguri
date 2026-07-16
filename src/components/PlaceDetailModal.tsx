@@ -4,10 +4,13 @@ import {
   categoryEmoji,
   categoryLabels,
   categoryList,
+  doneLabel,
   formatDateTime,
+  isExperience,
   naverMapUrl,
   priorityClasses,
   priorityLabels,
+  wantLabel,
 } from "@/lib/format";
 import type {
   CoupleMember,
@@ -140,14 +143,16 @@ function DetailBody({
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <a
-          href={naverMapUrl(detail)}
-          target="_blank"
-          rel="noreferrer"
-          className="btn-primary px-3 py-2 text-sm"
-        >
-          🗺️ 네이버 지도 · 길찾기
-        </a>
+        {!isExperience(detail.category) && (
+          <a
+            href={naverMapUrl(detail)}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-primary px-3 py-2 text-sm"
+          >
+            🗺️ 네이버 지도 · 길찾기
+          </a>
+        )}
         {detail.mapUrl && (
           <a
             href={detail.mapUrl}
@@ -179,6 +184,7 @@ function DetailBody({
             <ReactionView
               key={r.id}
               reaction={r}
+              category={detail.category}
               name={memberName(r.userId)}
               color={memberColor(r.userId)}
             />
@@ -191,6 +197,7 @@ function DetailBody({
         <h3 className="mb-2 text-sm font-semibold text-zinc-500">내 반응</h3>
         <MyReactionEditor
           placeId={detail.id}
+          category={detail.category}
           reaction={mine}
           onSaved={async () => {
             await reload();
@@ -237,10 +244,12 @@ function DetailBody({
 
 function ReactionView({
   reaction,
+  category,
   name,
   color,
 }: {
   reaction: PlaceReaction;
+  category: PlaceCategory;
   name: string;
   color: string;
 }) {
@@ -253,13 +262,15 @@ function ReactionView({
         </div>
         <div className="flex items-center gap-1.5">
           <span className="chip bg-blush-50 text-blush-500">
-            {reaction.wantToGo ? "💖 가고 싶어" : "🤍 글쎄"}
+            {reaction.wantToGo ? `💖 ${wantLabel(category)}` : "🤍 글쎄"}
           </span>
           <span className={`chip ${priorityClasses[reaction.priority]}`}>
             {priorityLabels[reaction.priority]}
           </span>
           {reaction.visited && (
-            <span className="chip bg-emerald-50 text-emerald-600">✓ 방문</span>
+            <span className="chip bg-emerald-50 text-emerald-600">
+              ✓ {doneLabel(category)}
+            </span>
           )}
         </div>
       </div>
@@ -274,10 +285,12 @@ function ReactionView({
 
 function MyReactionEditor({
   placeId,
+  category,
   reaction,
   onSaved,
 }: {
   placeId: string;
+  category: PlaceCategory;
   reaction: PlaceReaction | undefined;
   onSaved: () => Promise<void>;
 }) {
@@ -315,7 +328,7 @@ function MyReactionEditor({
               : "bg-white text-zinc-500 ring-blush-100"
           }`}
         >
-          {wantToGo ? "💖 가고 싶어" : "🤍 가고 싶어"}
+          {wantToGo ? `💖 ${wantLabel(category)}` : `🤍 ${wantLabel(category)}`}
         </button>
         <button
           type="button"
@@ -326,7 +339,7 @@ function MyReactionEditor({
               : "bg-white text-zinc-500 ring-blush-100"
           }`}
         >
-          {visited ? "✓ 다녀옴" : "다녀옴"}
+          {visited ? `✓ ${doneLabel(category)}` : doneLabel(category)}
         </button>
       </div>
 
@@ -649,7 +662,9 @@ function VisitsSection({
   return (
     <section className="mt-5">
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-zinc-500">방문 기록</h3>
+        <h3 className="text-sm font-semibold text-zinc-500">
+          {isExperience(detail.category) ? "함께한 기록" : "방문 기록"}
+        </h3>
         {!adding && (
           <button
             type="button"
@@ -698,7 +713,7 @@ function VisitsSection({
 
       {detail.visits.length === 0 && !adding ? (
         <p className="rounded-2xl bg-white px-3 py-3 text-sm text-zinc-300 ring-1 ring-blush-50">
-          아직 방문 기록이 없어요
+          아직 기록이 없어요
         </p>
       ) : (
         <div className="space-y-2">

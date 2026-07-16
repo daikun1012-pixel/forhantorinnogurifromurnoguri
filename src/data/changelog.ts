@@ -10,6 +10,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "1.8",
+    date: "2026-07-15",
+    title: "장소가 아니어도 좋아요 🎬🍰",
+    items: [
+      "새 카테고리: 영화·공연 🎬, 같이 보기 🍿, 맛보기 🍰",
+      "경험 위시는 주소 없이 이름만으로 간단히 추가",
+      "'하고 싶어 / 해봤어'로 문구도 자연스럽게",
+      "📍 장소만 / 🎬 경험만 필터",
+    ],
+  },
+  {
     version: "1.7",
     date: "2026-07-15",
     title: "지도에서도 골라볼 수 있어요 🔍",

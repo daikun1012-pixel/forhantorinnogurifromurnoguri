@@ -27,6 +27,10 @@ export type PlaceCategory =
   | "walk"
   | "travel"
   | "shopping"
+  // Experiences — things to do together that are not tied to a location.
+  | "movie"
+  | "watch"
+  | "taste"
   | "etc";
 
 export type Priority = "low" | "medium" | "high";

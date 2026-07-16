@@ -2,8 +2,10 @@ import type { CoupleMember, PlaceWithReactions, Priority } from "@/types";
 import {
   categoryEmoji,
   categoryLabels,
+  doneLabel,
   priorityClasses,
   priorityLabels,
+  wantLabel,
 } from "@/lib/format";
 import { Avatar } from "./ui";
 
@@ -44,10 +46,14 @@ export function PlaceCard({
               {categoryEmoji[place.category]} {categoryLabels[place.category]}
             </span>
             {bothWant && (
-              <span className="chip bg-blush-400 text-white">💞 둘 다 가고 싶어</span>
+              <span className="chip bg-blush-400 text-white">
+                💞 둘 다 {wantLabel(place.category)}
+              </span>
             )}
             {visited && (
-              <span className="chip bg-emerald-50 text-emerald-600">✓ 다녀옴</span>
+              <span className="chip bg-emerald-50 text-emerald-600">
+                ✓ {doneLabel(place.category)}
+              </span>
             )}
           </div>
           <h3 className="mt-2 truncate text-base font-bold text-zinc-800">
@@ -80,7 +86,7 @@ export function PlaceCard({
               }`}
             >
               <Avatar name={m.user.name} color={m.user.avatarColor} size={16} />
-              {wants ? "가고 싶어" : "글쎄"}
+              {wants ? wantLabel(place.category) : "글쎄"}
             </span>
           );
         })}
