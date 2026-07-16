@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { loadNaverMaps } from "@/lib/naver";
-import { categoryEmoji, naverMapUrl } from "@/lib/format";
+import { categoryEmoji, categoryLabels, categoryList, naverMapUrl } from "@/lib/format";
 import { PlaceDetailModal } from "@/components/PlaceDetailModal";
 import { EmptyState, ErrorState, Spinner } from "@/components/ui";
-import type { PlaceWithReactions } from "@/types";
+import type { PlaceCategory, PlaceWithReactions } from "@/types";
 
 const CATEGORY_COLORS: Record<string, string> = {
   cafe: "#a16207",
@@ -16,6 +16,30 @@ const CATEGORY_COLORS: Record<string, string> = {
   shopping: "#ec4899",
   etc: "#fb7185",
 };
+
+function MapChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`chip shrink-0 ring-1 ${
+        active
+          ? "bg-blush-400 text-white ring-blush-400"
+          : "bg-white text-zinc-500 ring-blush-100"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
 
 function escapeHtml(s: string): string {
   return s
@@ -34,6 +58,9 @@ export function MapPage() {
   const [error, setError] = useState<string | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [cat, setCat] = useState<"all" | PlaceCategory>("all");
+  const [onlyBoth, setOnlyBoth] = useState(false);
+  const [hideVisited, setHideVisited] = useState(false);
 
   const mapEl = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -54,15 +81,34 @@ export function MapPage() {
   }, [load]);
 
   const hasKey = Boolean(config?.naverMapClientId);
-  const located = (places ?? []).filter(
+
+  // Apply the filter chips to both the markers and the list below.
+  const filtered = useMemo(() => {
+    if (!places) return null;
+    return places.filter((p) => {
+      if (cat !== "all" && p.category !== cat) return false;
+      const wanters = p.reactions
+        .filter((r) => r.wantToGo)
+        .map((r) => r.userId);
+      const bothWant =
+        members.length === 2 && members.every((m) => wanters.includes(m.userId));
+      if (onlyBoth && !bothWant) return false;
+      const visited =
+        p.reactions.length > 0 && p.reactions.every((r) => r.visited);
+      if (hideVisited && visited) return false;
+      return true;
+    });
+  }, [places, cat, onlyBoth, hideVisited, members]);
+
+  const located = (filtered ?? []).filter(
     (p) => p.latitude != null && p.longitude != null,
   );
 
   // Initialise / update the Naver map.
   useEffect(() => {
-    if (!hasKey || !config || !mapEl.current || !places) return;
+    if (!hasKey || !config || !mapEl.current || !filtered) return;
     let cancelled = false;
-    const located = places.filter(
+    const located = filtered.filter(
       (p) => p.latitude != null && p.longitude != null,
     );
 
@@ -149,11 +195,31 @@ export function MapPage() {
     return () => {
       cancelled = true;
     };
-  }, [hasKey, config, places]);
+  }, [hasKey, config, filtered]);
 
   return (
     <div>
-      <h1 className="mb-4 text-xl font-bold text-zinc-800">지도</h1>
+      <h1 className="mb-3 text-xl font-bold text-zinc-800">지도</h1>
+
+      {/* Filters */}
+      <div className="-mx-4 mb-2 flex gap-2 overflow-x-auto px-4 pb-1">
+        <MapChip active={cat === "all"} onClick={() => setCat("all")}>
+          전체
+        </MapChip>
+        {categoryList.map((c) => (
+          <MapChip key={c} active={cat === c} onClick={() => setCat(c)}>
+            {categoryEmoji[c]} {categoryLabels[c]}
+          </MapChip>
+        ))}
+      </div>
+      <div className="mb-3 flex gap-2">
+        <MapChip active={onlyBoth} onClick={() => setOnlyBoth((v) => !v)}>
+          💞 둘 다 가고 싶어
+        </MapChip>
+        <MapChip active={hideVisited} onClick={() => setHideVisited((v) => !v)}>
+          다녀온 곳 숨기기
+        </MapChip>
+      </div>
 
       {!hasKey ? (
         <MapPlaceholder />
@@ -169,17 +235,24 @@ export function MapPage() {
       <div className="mt-4">
         {error ? (
           <ErrorState message={error} onRetry={load} />
-        ) : !places ? (
+        ) : !filtered ? (
           <Spinner />
-        ) : places.length === 0 ? (
-          <EmptyState emoji="📍" title="아직 저장된 장소가 없어요" />
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            emoji="📍"
+            title={
+              (places?.length ?? 0) === 0
+                ? "아직 저장된 장소가 없어요"
+                : "조건에 맞는 곳이 없어요"
+            }
+          />
         ) : (
           <>
             <h3 className="mb-2 text-sm font-semibold text-zinc-500">
-              장소 {places.length} · 지도 표시 {located.length}
+              장소 {filtered.length} · 지도 표시 {located.length}
             </h3>
             <div className="space-y-2">
-              {places.map((p) => (
+              {filtered.map((p) => (
                 <button
                   key={p.id}
                   type="button"
