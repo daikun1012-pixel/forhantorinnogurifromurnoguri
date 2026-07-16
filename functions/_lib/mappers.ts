@@ -16,6 +16,9 @@ export const CATEGORIES = [
   "walk",
   "travel",
   "shopping",
+  "movie",
+  "watch",
+  "taste",
   "etc",
 ] as const;
 

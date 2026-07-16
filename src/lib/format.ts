@@ -7,6 +7,9 @@ export const categoryLabels: Record<PlaceCategory, string> = {
   walk: "산책",
   travel: "여행",
   shopping: "쇼핑",
+  movie: "영화·공연",
+  watch: "같이 보기",
+  taste: "맛보기",
   etc: "기타",
 };
 
@@ -17,8 +20,27 @@ export const categoryEmoji: Record<PlaceCategory, string> = {
   walk: "🌳",
   travel: "✈️",
   shopping: "🛍️",
+  movie: "🎬",
+  watch: "🍿",
+  taste: "🍰",
   etc: "📍",
 };
+
+/** Experience categories: things to do together, not tied to a location. */
+export const experienceCategories: PlaceCategory[] = [
+  "movie",
+  "watch",
+  "taste",
+];
+
+export function isExperience(c: PlaceCategory): boolean {
+  return experienceCategories.includes(c);
+}
+
+export const wantLabel = (c: PlaceCategory) =>
+  isExperience(c) ? "하고 싶어" : "가고 싶어";
+export const doneLabel = (c: PlaceCategory) =>
+  isExperience(c) ? "해봤어" : "다녀옴";
 
 export const priorityLabels: Record<Priority, string> = {
   low: "낮음",
@@ -39,8 +61,16 @@ export const categoryList: PlaceCategory[] = [
   "walk",
   "travel",
   "shopping",
+  "movie",
+  "watch",
+  "taste",
   "etc",
 ];
+
+/** Location-bound categories (used by the map filters). */
+export const placeCategoryList: PlaceCategory[] = categoryList.filter(
+  (c) => !isExperience(c),
+);
 
 /** Strip floor/unit details that break Naver place search (keeps the road/lot address). */
 function cleanAddressForSearch(address: string): string {

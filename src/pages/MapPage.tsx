@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { loadNaverMaps } from "@/lib/naver";
-import { categoryEmoji, categoryLabels, categoryList, naverMapUrl } from "@/lib/format";
+import { categoryEmoji, categoryLabels, isExperience, naverMapUrl, placeCategoryList } from "@/lib/format";
 import { PlaceDetailModal } from "@/components/PlaceDetailModal";
 import { EmptyState, ErrorState, Spinner } from "@/components/ui";
 import type { PlaceCategory, PlaceWithReactions } from "@/types";
@@ -86,6 +86,7 @@ export function MapPage() {
   const filtered = useMemo(() => {
     if (!places) return null;
     return places.filter((p) => {
+      if (isExperience(p.category)) return false; // experiences have no location
       if (cat !== "all" && p.category !== cat) return false;
       const wanters = p.reactions
         .filter((r) => r.wantToGo)
@@ -206,7 +207,7 @@ export function MapPage() {
         <MapChip active={cat === "all"} onClick={() => setCat("all")}>
           전체
         </MapChip>
-        {categoryList.map((c) => (
+        {placeCategoryList.map((c) => (
           <MapChip key={c} active={cat === c} onClick={() => setCat(c)}>
             {categoryEmoji[c]} {categoryLabels[c]}
           </MapChip>
