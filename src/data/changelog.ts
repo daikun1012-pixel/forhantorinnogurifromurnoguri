@@ -10,6 +10,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "1.7",
+    date: "2026-07-15",
+    title: "지도에서도 골라볼 수 있어요 🔍",
+    items: [
+      "지도에 카테고리 필터 추가",
+      "💞 둘 다 가고 싶은 곳만 보기",
+      "다녀온 곳 숨기기",
+    ],
+  },
+  {
     version: "1.6",
     date: "2026-07-15",
     title: "우리의 추억이 쌓여요 📖",
