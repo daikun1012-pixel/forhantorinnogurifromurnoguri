@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
+import { useSession } from "@/lib/session";
+import { compressImage } from "@/lib/image";
 import {
   categoryEmoji,
   categoryLabels,
@@ -636,22 +638,38 @@ function VisitsSection({
   memberName: (id: string) => string;
   reload: () => Promise<void>;
 }) {
+  const { config } = useSession();
+  const photosEnabled = config?.photosEnabled ?? false;
   const [adding, setAdding] = useState(false);
   const [visitedAt, setVisitedAt] = useState(
     new Date().toISOString().slice(0, 10),
   );
   const [note, setNote] = useState("");
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const resetForm = () => {
+    setAdding(false);
+    setNote("");
+    setPendingFiles([]);
+  };
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      await api.addVisit(detail.id, { visitedAt, note: note.trim() });
-      setAdding(false);
-      setNote("");
+      const visit = await api.addVisit(detail.id, {
+        visitedAt,
+        note: note.trim(),
+      });
+      for (const file of pendingFiles) {
+        const blob = await compressImage(file);
+        await api.uploadVisitPhoto(visit.id, blob);
+      }
+      resetForm();
       await reload();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "저장 실패");
@@ -692,11 +710,65 @@ function VisitsSection({
             value={note}
             onChange={(e) => setNote(e.target.value)}
           />
+
+          {photosEnabled && (
+            <div>
+              {pendingFiles.length > 0 && (
+                <div className="mb-2 grid grid-cols-3 gap-1.5">
+                  {pendingFiles.map((f, i) => (
+                    <div
+                      key={i}
+                      className="relative aspect-square overflow-hidden rounded-xl ring-1 ring-blush-50"
+                    >
+                      <img
+                        src={URL.createObjectURL(f)}
+                        alt="첨부 미리보기"
+                        className="h-full w-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPendingFiles((prev) =>
+                            prev.filter((_, idx) => idx !== i),
+                          )
+                        }
+                        className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/50 text-xs text-white"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="btn-soft w-full py-2 text-sm"
+              >
+                📷 사진 첨부
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []).filter((f) =>
+                    f.type.startsWith("image/"),
+                  );
+                  setPendingFiles((prev) => [...prev, ...files]);
+                  if (fileRef.current) fileRef.current.value = "";
+                }}
+              />
+            </div>
+          )}
+
           {error && <p className="text-sm text-red-500">{error}</p>}
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => setAdding(false)}
+              onClick={resetForm}
               className="btn-ghost flex-1 py-2"
             >
               취소
