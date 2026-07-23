@@ -7,7 +7,6 @@ import {
   categoryLabels,
   categoryList,
   doneLabel,
-  formatDateTime,
   isExperience,
   naverMapUrl,
   priorityClasses,
@@ -17,7 +16,6 @@ import {
 import type {
   CoupleMember,
   PlaceCategory,
-  PlaceComment,
   PlaceDetail,
   PlaceReaction,
   Priority,
@@ -220,14 +218,8 @@ function DetailBody({
         }}
       />
 
-      {/* Comments */}
-      <CommentsSection
-        detail={detail}
-        currentUserId={currentUserId}
-        memberName={memberName}
-        memberColor={memberColor}
-        reload={reload}
-      />
+      {/* Comments — hidden for now (API/data kept). Re-enable by restoring
+          <CommentsSection … /> here. */}
 
       {/* Danger */}
       <DeletePlace
@@ -383,91 +375,9 @@ function MyReactionEditor({
   );
 }
 
-function CommentsSection({
-  detail,
-  currentUserId,
-  memberName,
-  memberColor,
-  reload,
-}: {
-  detail: PlaceDetail;
-  currentUserId: string;
-  memberName: (id: string) => string;
-  memberColor: (id: string) => string;
-  reload: () => Promise<void>;
-}) {
-  const [body, setBody] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const add = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!body.trim()) return;
-    setBusy(true);
-    try {
-      await api.addComment(detail.id, body.trim());
-      setBody("");
-      await reload();
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const remove = async (c: PlaceComment) => {
-    await api.deleteComment(c.id);
-    await reload();
-  };
-
-  return (
-    <section className="mt-5">
-      <h3 className="mb-2 text-sm font-semibold text-zinc-500">댓글</h3>
-      {detail.comments.length === 0 ? (
-        <p className="rounded-2xl bg-white px-3 py-3 text-center text-sm text-zinc-300 ring-1 ring-blush-50">
-          이 장소에 대한 첫 댓글을 남겨보세요
-        </p>
-      ) : (
-        <div className="space-y-2">
-          {detail.comments.map((c) => (
-            <div key={c.id} className="flex gap-2">
-              <Avatar name={memberName(c.userId)} color={memberColor(c.userId)} size={28} />
-              <div className="flex-1 rounded-2xl bg-white px-3 py-2 ring-1 ring-blush-50">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-sm font-semibold text-zinc-700">
-                    {memberName(c.userId)}
-                  </span>
-                  <span className="text-[11px] text-zinc-300">
-                    {formatDateTime(c.createdAt)}
-                  </span>
-                </div>
-                <p className="text-sm text-zinc-600">{c.body}</p>
-                {c.userId === currentUserId && (
-                  <button
-                    type="button"
-                    onClick={() => remove(c)}
-                    className="mt-1 text-[11px] text-zinc-300 hover:text-red-400"
-                  >
-                    삭제
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <form onSubmit={add} className="mt-3 flex gap-2">
-        <input
-          className="input"
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="댓글 남기기…"
-        />
-        <button type="submit" disabled={busy} className="btn-soft shrink-0">
-          등록
-        </button>
-      </form>
-    </section>
-  );
-}
+// NOTE: the comments UI (CommentsSection) was hidden by request. The API
+// (/api/places/:id/comments, /api/comments/:id) and data are still intact,
+// so it can be restored from git history if wanted.
 
 function DeletePlace({
   placeId,
