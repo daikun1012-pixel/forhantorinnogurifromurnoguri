@@ -4,6 +4,9 @@
 export interface Env {
   DB: D1Database;
 
+  // R2 bucket for visit photos (optional; photo features are hidden if unset).
+  PHOTOS?: R2Bucket;
+
   // Naver integration (set as Pages environment variables / secrets).
   // Public map client id (NCP Maps).
   NAVER_MAP_CLIENT_ID?: string;

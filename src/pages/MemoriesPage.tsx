@@ -3,6 +3,7 @@ import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { categoryEmoji } from "@/lib/format";
 import { PlaceDetailModal } from "@/components/PlaceDetailModal";
+import { VisitPhotos } from "@/components/VisitPhotos";
 import { Avatar, EmptyState, ErrorState, Spinner } from "@/components/ui";
 import type { VisitWithPlace } from "@/types";
 
@@ -94,6 +95,12 @@ export function MemoriesPage() {
                     )}
                   </div>
                 </button>
+                <VisitPhotos
+                  visitId={v.id}
+                  photoIds={v.photos}
+                  canEdit={v.createdBy === currentUserId}
+                  onChanged={load}
+                />
                 <div className="mt-2 flex items-center justify-between border-t border-blush-50 pt-2">
                   <span className="flex items-center gap-1.5 text-[11px] text-zinc-400">
                     {writer && (
