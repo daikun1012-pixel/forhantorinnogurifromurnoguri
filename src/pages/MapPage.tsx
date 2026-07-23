@@ -1,11 +1,53 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { loadNaverMaps } from "@/lib/naver";
-import { categoryEmoji } from "@/lib/format";
+import { categoryEmoji, categoryLabels, isExperience, naverMapUrl, placeCategoryList } from "@/lib/format";
 import { PlaceDetailModal } from "@/components/PlaceDetailModal";
 import { EmptyState, ErrorState, Spinner } from "@/components/ui";
-import type { PlaceWithReactions } from "@/types";
+import type { PlaceCategory, PlaceWithReactions } from "@/types";
+
+const CATEGORY_COLORS: Record<string, string> = {
+  cafe: "#a16207",
+  restaurant: "#f97316",
+  exhibition: "#8b5cf6",
+  walk: "#22c55e",
+  travel: "#3b82f6",
+  shopping: "#ec4899",
+  etc: "#fb7185",
+};
+
+function MapChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`chip shrink-0 ring-1 ${
+        active
+          ? "bg-blush-400 text-white ring-blush-400"
+          : "bg-white text-zinc-500 ring-blush-100"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
 export function MapPage() {
   const { session, config } = useSession();
@@ -16,10 +58,14 @@ export function MapPage() {
   const [error, setError] = useState<string | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [cat, setCat] = useState<"all" | PlaceCategory>("all");
+  const [onlyBoth, setOnlyBoth] = useState(false);
+  const [hideVisited, setHideVisited] = useState(false);
 
   const mapEl = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const infoRef = useRef<any>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -35,15 +81,35 @@ export function MapPage() {
   }, [load]);
 
   const hasKey = Boolean(config?.naverMapClientId);
-  const located = (places ?? []).filter(
+
+  // Apply the filter chips to both the markers and the list below.
+  const filtered = useMemo(() => {
+    if (!places) return null;
+    return places.filter((p) => {
+      if (isExperience(p.category)) return false; // experiences have no location
+      if (cat !== "all" && p.category !== cat) return false;
+      const wanters = p.reactions
+        .filter((r) => r.wantToGo)
+        .map((r) => r.userId);
+      const bothWant =
+        members.length === 2 && members.every((m) => wanters.includes(m.userId));
+      if (onlyBoth && !bothWant) return false;
+      const visited =
+        p.reactions.length > 0 && p.reactions.every((r) => r.visited);
+      if (hideVisited && visited) return false;
+      return true;
+    });
+  }, [places, cat, onlyBoth, hideVisited, members]);
+
+  const located = (filtered ?? []).filter(
     (p) => p.latitude != null && p.longitude != null,
   );
 
   // Initialise / update the Naver map.
   useEffect(() => {
-    if (!hasKey || !config || !mapEl.current || !places) return;
+    if (!hasKey || !config || !mapEl.current || !filtered) return;
     let cancelled = false;
-    const located = places.filter(
+    const located = filtered.filter(
       (p) => p.latitude != null && p.longitude != null,
     );
 
@@ -65,13 +131,56 @@ export function MapPage() {
 
         markersRef.current.forEach((m) => m.setMap(null));
         markersRef.current = [];
+        if (!infoRef.current) {
+          infoRef.current = new naver.maps.InfoWindow({ content: "" });
+        }
 
         const bounds =
           located.length > 0 ? new naver.maps.LatLngBounds() : null;
         located.forEach((p) => {
           const pos = new naver.maps.LatLng(p.latitude, p.longitude);
-          const marker = new naver.maps.Marker({ position: pos, map: mapRef.current });
-          naver.maps.Event.addListener(marker, "click", () => setOpenId(p.id));
+          const marker = new naver.maps.Marker({
+            position: pos,
+            map: mapRef.current,
+            title: p.name,
+            icon: {
+              content: `<div style="display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.25))">
+                  <div style="width:34px;height:34px;border-radius:50%;background:#fff;border:2.5px solid ${
+                    CATEGORY_COLORS[p.category] ?? "#fb7185"
+                  };display:flex;align-items:center;justify-content:center;font-size:17px">${
+                    categoryEmoji[p.category]
+                  }</div>
+                  <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid ${
+                    CATEGORY_COLORS[p.category] ?? "#fb7185"
+                  };margin-top:-1px"></div>
+                </div>`,
+              anchor: new naver.maps.Point(17, 42),
+            },
+          });
+          naver.maps.Event.addListener(marker, "click", () => {
+            const url = naverMapUrl(p);
+            infoRef.current.setContent(
+              `<div style="padding:10px 12px;max-width:220px;font-size:13px;line-height:1.5">
+                 <div style="font-weight:700;color:#27272a;margin-bottom:6px">${escapeHtml(
+                   p.name,
+                 )}</div>
+                 <a href="${url}" target="_blank" rel="noreferrer" style="color:#f43f5e;font-weight:600;text-decoration:none">🗺️ 길찾기</a>
+                 <span style="color:#d4d4d8"> · </span>
+                 <a href="#" id="iw-detail-${p.id}" style="color:#71717a;text-decoration:none">상세</a>
+               </div>`,
+            );
+            infoRef.current.open(mapRef.current, marker);
+            setTimeout(() => {
+              const el = document.getElementById(`iw-detail-${p.id}`);
+              if (el) {
+                el.onclick = (e) => {
+                  e.preventDefault();
+                  infoRef.current.close();
+                  setOpenId(p.id);
+                };
+              }
+            }, 0);
+          });
           markersRef.current.push(marker);
           bounds?.extend(pos);
         });
@@ -87,11 +196,31 @@ export function MapPage() {
     return () => {
       cancelled = true;
     };
-  }, [hasKey, config, places]);
+  }, [hasKey, config, filtered]);
 
   return (
     <div>
-      <h1 className="mb-4 text-xl font-bold text-zinc-800">지도</h1>
+      <h1 className="mb-3 text-xl font-bold text-zinc-800">지도</h1>
+
+      {/* Filters */}
+      <div className="-mx-4 mb-2 flex gap-2 overflow-x-auto px-4 pb-1">
+        <MapChip active={cat === "all"} onClick={() => setCat("all")}>
+          전체
+        </MapChip>
+        {placeCategoryList.map((c) => (
+          <MapChip key={c} active={cat === c} onClick={() => setCat(c)}>
+            {categoryEmoji[c]} {categoryLabels[c]}
+          </MapChip>
+        ))}
+      </div>
+      <div className="mb-3 flex gap-2">
+        <MapChip active={onlyBoth} onClick={() => setOnlyBoth((v) => !v)}>
+          💞 둘 다 가고 싶어
+        </MapChip>
+        <MapChip active={hideVisited} onClick={() => setHideVisited((v) => !v)}>
+          다녀온 곳 숨기기
+        </MapChip>
+      </div>
 
       {!hasKey ? (
         <MapPlaceholder />
@@ -107,17 +236,24 @@ export function MapPage() {
       <div className="mt-4">
         {error ? (
           <ErrorState message={error} onRetry={load} />
-        ) : !places ? (
+        ) : !filtered ? (
           <Spinner />
-        ) : places.length === 0 ? (
-          <EmptyState emoji="📍" title="아직 저장된 장소가 없어요" />
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            emoji="📍"
+            title={
+              (places?.length ?? 0) === 0
+                ? "아직 저장된 장소가 없어요"
+                : "조건에 맞는 곳이 없어요"
+            }
+          />
         ) : (
           <>
             <h3 className="mb-2 text-sm font-semibold text-zinc-500">
-              장소 {places.length} · 지도 표시 {located.length}
+              장소 {filtered.length} · 지도 표시 {located.length}
             </h3>
             <div className="space-y-2">
-              {places.map((p) => (
+              {filtered.map((p) => (
                 <button
                   key={p.id}
                   type="button"

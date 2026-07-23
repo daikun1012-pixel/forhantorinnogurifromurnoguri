@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { api, ApiError, type SearchResult } from "@/lib/api";
 import { useSession } from "@/lib/session";
-import { categoryEmoji, categoryLabels, categoryList } from "@/lib/format";
+import {
+  categoryEmoji,
+  categoryLabels,
+  categoryList,
+  isExperience,
+} from "@/lib/format";
 import type { PlaceCategory, PlaceWithReactions } from "@/types";
 import { Modal } from "./Modal";
 
@@ -24,6 +29,7 @@ export function AddPlaceModal({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dupMsg, setDupMsg] = useState<string | null>(null);
 
   // Naver search state.
   const [query, setQuery] = useState("");
@@ -65,14 +71,23 @@ export function AddPlaceModal({
     setSaving(true);
     setError(null);
     try {
+      const exp = isExperience(category);
       const place = await api.createPlace({
         name: name.trim(),
         category,
-        address: address.trim(),
+        address: exp ? "" : address.trim(),
         mapUrl: mapUrl.trim(),
-        latitude: coords.lat,
-        longitude: coords.lng,
+        latitude: exp ? null : coords.lat,
+        longitude: exp ? null : coords.lng,
       });
+      if (place.duplicate) {
+        setDupMsg(
+          "이미 등록된 곳이에요! 내 '가고 싶어'로 표시해 두 사람의 후보로 매칭했어요 💞",
+        );
+        onCreated(place);
+        setTimeout(onClose, 1600);
+        return;
+      }
       onCreated(place);
       onClose();
     } catch (err) {
@@ -83,10 +98,10 @@ export function AddPlaceModal({
 
   return (
     <Modal onClose={onClose}>
-      <h2 className="mb-4 text-lg font-bold text-zinc-800">장소 추가</h2>
+      <h2 className="mb-4 text-lg font-bold text-zinc-800">위시 추가</h2>
 
-      {/* Naver place search */}
-      {searchEnabled && (
+      {/* Naver place search (location-bound wishes only) */}
+      {searchEnabled && !isExperience(category) && (
         <div className="mb-4 rounded-2xl bg-blush-50/60 p-3">
           <form onSubmit={runSearch} className="flex gap-2">
             <input
@@ -136,12 +151,18 @@ export function AddPlaceModal({
 
       <form onSubmit={submit} className="space-y-4">
         <div>
-          <label className="label">장소 이름</label>
+          <label className="label">
+            {isExperience(category) ? "이름" : "장소 이름"}
+          </label>
           <input
             className="input"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="예) 연남동 감성 카페"
+            placeholder={
+              isExperience(category)
+                ? "예) 영화 <듄3> 같이 보기, 딸기 케이크 맛보기"
+                : "예) 연남동 감성 카페"
+            }
           />
         </div>
 
@@ -165,15 +186,17 @@ export function AddPlaceModal({
           </div>
         </div>
 
-        <div>
-          <label className="label">주소 (선택)</label>
-          <input
-            className="input"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            placeholder="예) 서울 마포구 연남동"
-          />
-        </div>
+        {!isExperience(category) && (
+          <div>
+            <label className="label">주소 (선택)</label>
+            <input
+              className="input"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="예) 서울 마포구 연남동"
+            />
+          </div>
+        )}
 
         <div>
           <label className="label">정보 링크 (사이트·블로그, 선택)</label>
@@ -181,11 +204,17 @@ export function AddPlaceModal({
             className="input"
             value={mapUrl}
             onChange={(e) => setMapUrl(e.target.value)}
-            placeholder="블로그·홈페이지 등 참고 링크"
+            placeholder={
+              isExperience(category)
+                ? "예고편·리뷰 등 참고 링크"
+                : "블로그·홈페이지 등 참고 링크"
+            }
           />
-          <p className="mt-1 text-[11px] text-zinc-400">
-            길찾기는 상세 화면의 "네이버 지도" 버튼으로 열 수 있어요.
-          </p>
+          {!isExperience(category) && (
+            <p className="mt-1 text-[11px] text-zinc-400">
+              길찾기는 상세 화면의 "네이버 지도" 버튼으로 열 수 있어요.
+            </p>
+          )}
         </div>
 
         {coords.lat != null && coords.lng != null && (
@@ -194,6 +223,11 @@ export function AddPlaceModal({
           </p>
         )}
         {error && <p className="text-sm text-red-500">{error}</p>}
+        {dupMsg && (
+          <p className="rounded-2xl bg-blush-50 px-3 py-2 text-sm font-medium text-blush-500">
+            {dupMsg}
+          </p>
+        )}
 
         <div className="flex gap-2 pt-1">
           <button type="button" onClick={onClose} className="btn-ghost flex-1">

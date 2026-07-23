@@ -5,10 +5,11 @@ import { PlaceCard } from "@/components/PlaceCard";
 import { AddPlaceModal } from "@/components/AddPlaceModal";
 import { PlaceDetailModal } from "@/components/PlaceDetailModal";
 import { EmptyState, ErrorState, Spinner } from "@/components/ui";
-import { categoryLabels, categoryList } from "@/lib/format";
+import { categoryLabels, categoryList, isExperience } from "@/lib/format";
 import type { PlaceCategory, PlaceWithReactions } from "@/types";
 
 type CatFilter = "all" | PlaceCategory;
+type KindFilter = "all" | "place" | "experience";
 
 export function PlacesPage() {
   const { session } = useSession();
@@ -18,6 +19,7 @@ export function PlacesPage() {
   const [places, setPlaces] = useState<PlaceWithReactions[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cat, setCat] = useState<CatFilter>("all");
+  const [kind, setKind] = useState<KindFilter>("all");
   const [onlyBoth, setOnlyBoth] = useState(false);
   const [hideVisited, setHideVisited] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -36,10 +38,33 @@ export function PlacesPage() {
     void load();
   }, [load]);
 
+  // Next-date candidates: both want to go, not visited yet.
+  const candidates = useMemo(() => {
+    if (!places || members.length < 2) return [];
+    const rank = { high: 0, medium: 1, low: 2 } as const;
+    return places
+      .filter((p) => {
+        const wanters = p.reactions
+          .filter((r) => r.wantToGo)
+          .map((r) => r.userId);
+        const bothWant = members.every((m) => wanters.includes(m.userId));
+        const visited =
+          p.reactions.length > 0 && p.reactions.every((r) => r.visited);
+        return bothWant && !visited;
+      })
+      .sort((a, b) => {
+        const top = (p: PlaceWithReactions) =>
+          Math.min(...p.reactions.map((r) => rank[r.priority]));
+        return top(a) - top(b);
+      });
+  }, [places, members]);
+
   const visible = useMemo(() => {
     if (!places) return [];
     return places.filter((p) => {
       if (cat !== "all" && p.category !== cat) return false;
+      if (kind === "place" && isExperience(p.category)) return false;
+      if (kind === "experience" && !isExperience(p.category)) return false;
       const wanters = p.reactions.filter((r) => r.wantToGo).map((r) => r.userId);
       const bothWant =
         members.length === 2 && members.every((m) => wanters.includes(m.userId));
@@ -48,13 +73,13 @@ export function PlacesPage() {
       if (hideVisited && visited) return false;
       return true;
     });
-  }, [places, cat, onlyBoth, hideVisited, members]);
+  }, [places, cat, kind, onlyBoth, hideVisited, members]);
 
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-bold text-zinc-800">
-          가고 싶은 곳{" "}
+          함께 하고 싶은 것{" "}
           {places && <span className="text-blush-400">{places.length}</span>}
         </h1>
         <button
@@ -65,6 +90,46 @@ export function PlacesPage() {
           + 추가
         </button>
       </div>
+
+      {/* Next date candidates */}
+      {candidates.length > 0 && (
+        <div className="card mb-4 bg-gradient-to-r from-blush-50 to-white">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-zinc-700">
+                💞 다음 데이트 후보{" "}
+                <span className="text-blush-500">{candidates.length}</span>곳
+              </h2>
+              <p className="mt-0.5 text-xs text-zinc-400">
+                둘 다 원하고 아직 안 해본 것들이에요
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                setOpenId(
+                  candidates[Math.floor(Math.random() * candidates.length)].id,
+                )
+              }
+              className="btn-primary shrink-0 px-3 py-2 text-sm"
+            >
+              🎲 오늘 여기 어때?
+            </button>
+          </div>
+          <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1">
+            {candidates.slice(0, 8).map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setOpenId(p.id)}
+                className="chip shrink-0 bg-white text-zinc-600 ring-1 ring-blush-100"
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="-mx-4 mb-2 flex gap-2 overflow-x-auto px-4 pb-1">
@@ -77,12 +142,26 @@ export function PlacesPage() {
           </FilterChip>
         ))}
       </div>
-      <div className="mb-4 flex gap-2">
+      <div className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1">
         <FilterChip active={onlyBoth} onClick={() => setOnlyBoth((v) => !v)}>
-          💞 둘 다 가고 싶어
+          💞 둘 다 원해요
         </FilterChip>
         <FilterChip active={hideVisited} onClick={() => setHideVisited((v) => !v)}>
-          다녀온 곳 숨기기
+          해본 곳 숨기기
+        </FilterChip>
+        <FilterChip
+          active={kind === "place"}
+          onClick={() => setKind((k) => (k === "place" ? "all" : "place"))}
+        >
+          📍 장소만
+        </FilterChip>
+        <FilterChip
+          active={kind === "experience"}
+          onClick={() =>
+            setKind((k) => (k === "experience" ? "all" : "experience"))
+          }
+        >
+          🎬 경험만
         </FilterChip>
       </div>
 
@@ -128,7 +207,12 @@ export function PlacesPage() {
         <AddPlaceModal
           onClose={() => setAdding(false)}
           onCreated={(place) =>
-            setPlaces((prev) => (prev ? [place, ...prev] : [place]))
+            setPlaces((prev) => {
+              if (!prev) return [place];
+              return prev.some((p) => p.id === place.id)
+                ? prev.map((p) => (p.id === place.id ? place : p))
+                : [place, ...prev];
+            })
           }
         />
       )}

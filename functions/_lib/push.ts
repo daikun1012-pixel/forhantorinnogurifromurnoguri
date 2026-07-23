@@ -119,25 +119,37 @@ async function encryptPayload(
   return concat(salt, rs, new Uint8Array([asPub.length]), asPub, ciphertext);
 }
 
+// Env values can arrive with stray whitespace from copy/paste; normalise them.
+const clean = (v: string | undefined): string => (v ?? "").trim();
+
+function vapidSubject(env: Env): string {
+  let sub = clean(env.VAPID_SUBJECT);
+  if (!sub) return "mailto:admin@example.com";
+  if (!/^(mailto:|https?:\/\/)/i.test(sub)) sub = `mailto:${sub}`;
+  return sub;
+}
+
 async function vapidToken(env: Env, endpoint: string): Promise<string> {
   const aud = new URL(endpoint).origin;
   const header = bytesToB64url(te(JSON.stringify({ typ: "JWT", alg: "ES256" })));
+  const now = Math.floor(Date.now() / 1000);
   const payload = bytesToB64url(
     te(
       JSON.stringify({
         aud,
-        exp: Math.floor(Date.now() / 1000) + 12 * 60 * 60,
-        sub: env.VAPID_SUBJECT || "mailto:admin@example.com",
+        exp: now + 12 * 60 * 60,
+        iat: now,
+        sub: vapidSubject(env),
       }),
     ),
   );
   const signingInput = `${header}.${payload}`;
 
-  const pub = b64urlToBytes(env.VAPID_PUBLIC_KEY as string);
+  const pub = b64urlToBytes(clean(env.VAPID_PUBLIC_KEY));
   const jwk: JsonWebKey = {
     kty: "EC",
     crv: "P-256",
-    d: env.VAPID_PRIVATE_KEY,
+    d: clean(env.VAPID_PRIVATE_KEY),
     x: bytesToB64url(pub.slice(1, 33)),
     y: bytesToB64url(pub.slice(33, 65)),
     ext: true,
@@ -163,10 +175,47 @@ export function pushConfigured(env: Env): boolean {
   return Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY);
 }
 
+/** Diagnose the VAPID config: does the built JWT verify against the public key? */
+export async function vapidSelfCheck(env: Env): Promise<{
+  signatureValid: boolean;
+  subject: string;
+  publicKeyLength: number;
+  privateKeyLength: number;
+}> {
+  const token = await vapidToken(env, "https://web.push.apple.com/");
+  const [h, p, s] = token.split(".");
+  const pub = b64urlToBytes(clean(env.VAPID_PUBLIC_KEY));
+  let signatureValid = false;
+  try {
+    const verifyKey = await crypto.subtle.importKey(
+      "raw",
+      pub,
+      { name: "ECDSA", namedCurve: "P-256" },
+      false,
+      ["verify"],
+    );
+    signatureValid = await crypto.subtle.verify(
+      { name: "ECDSA", hash: "SHA-256" },
+      verifyKey,
+      b64urlToBytes(s),
+      te(`${h}.${p}`),
+    );
+  } catch {
+    signatureValid = false;
+  }
+  return {
+    signatureValid,
+    subject: vapidSubject(env),
+    publicKeyLength: clean(env.VAPID_PUBLIC_KEY).length,
+    privateKeyLength: clean(env.VAPID_PRIVATE_KEY).length,
+  };
+}
+
 export interface PushResult {
   ok: boolean;
   status: number;
   gone: boolean; // 404/410 => subscription should be removed
+  error?: string;
 }
 
 export async function sendPush(
@@ -182,13 +231,18 @@ export async function sendPush(
       TTL: "2419200",
       "Content-Encoding": "aes128gcm",
       "Content-Type": "application/octet-stream",
-      Authorization: `vapid t=${token}, k=${env.VAPID_PUBLIC_KEY}`,
+      Authorization: `vapid t=${token}, k=${clean(env.VAPID_PUBLIC_KEY)}`,
     },
     body,
   });
+  let error: string | undefined;
+  if (!res.ok) {
+    error = (await res.text().catch(() => "")).slice(0, 300) || undefined;
+  }
   return {
     ok: res.ok,
     status: res.status,
     gone: res.status === 404 || res.status === 410,
+    error,
   };
 }

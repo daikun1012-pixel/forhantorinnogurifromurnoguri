@@ -11,7 +11,8 @@ export const onRequestGet: PagesFunction<Env> = ({ env }) =>
       searchEnabled: Boolean(
         env.NAVER_SEARCH_CLIENT_ID && env.NAVER_SEARCH_CLIENT_SECRET,
       ),
-      vapidPublicKey: env.VAPID_PUBLIC_KEY ?? "",
+      vapidPublicKey: (env.VAPID_PUBLIC_KEY ?? "").trim(),
       pushEnabled: Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY),
+      photosEnabled: Boolean(env.PHOTOS),
     });
   });

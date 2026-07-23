@@ -1,22 +1,28 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
+import { useSession } from "@/lib/session";
+import { compressImage } from "@/lib/image";
 import {
   categoryEmoji,
   categoryLabels,
-  formatDateTime,
+  categoryList,
+  doneLabel,
+  isExperience,
   naverMapUrl,
   priorityClasses,
   priorityLabels,
+  wantLabel,
 } from "@/lib/format";
 import type {
   CoupleMember,
-  PlaceComment,
+  PlaceCategory,
   PlaceDetail,
   PlaceReaction,
   Priority,
 } from "@/types";
 import { Modal } from "./Modal";
 import { Avatar, ErrorState, Spinner } from "./ui";
+import { VisitPhotos } from "./VisitPhotos";
 
 const PRIORITIES: Priority[] = ["low", "medium", "high"];
 
@@ -99,6 +105,21 @@ function DetailBody({
   const partnerReactions = detail.reactions.filter(
     (r) => r.userId !== currentUserId,
   );
+  const [editing, setEditing] = useState(false);
+
+  if (editing) {
+    return (
+      <EditPlaceForm
+        detail={detail}
+        onCancel={() => setEditing(false)}
+        onSaved={async () => {
+          setEditing(false);
+          await reload();
+          onChanged();
+        }}
+      />
+    );
+  }
 
   return (
     <div>
@@ -123,14 +144,16 @@ function DetailBody({
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <a
-          href={naverMapUrl(detail)}
-          target="_blank"
-          rel="noreferrer"
-          className="btn-primary px-3 py-2 text-sm"
-        >
-          🗺️ 네이버 지도 · 길찾기
-        </a>
+        {!isExperience(detail.category) && (
+          <a
+            href={naverMapUrl(detail)}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-primary px-3 py-2 text-sm"
+          >
+            🗺️ 네이버 지도 · 길찾기
+          </a>
+        )}
         {detail.mapUrl && (
           <a
             href={detail.mapUrl}
@@ -141,6 +164,13 @@ function DetailBody({
             🔗 정보 링크
           </a>
         )}
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="btn-soft px-3 py-2 text-sm"
+        >
+          ✏️ 정보 수정
+        </button>
       </div>
 
       {/* Partner reaction */}
@@ -155,6 +185,7 @@ function DetailBody({
             <ReactionView
               key={r.id}
               reaction={r}
+              category={detail.category}
               name={memberName(r.userId)}
               color={memberColor(r.userId)}
             />
@@ -167,6 +198,7 @@ function DetailBody({
         <h3 className="mb-2 text-sm font-semibold text-zinc-500">내 반응</h3>
         <MyReactionEditor
           placeId={detail.id}
+          category={detail.category}
           reaction={mine}
           onSaved={async () => {
             await reload();
@@ -175,14 +207,19 @@ function DetailBody({
         />
       </section>
 
-      {/* Comments */}
-      <CommentsSection
+      {/* Visits */}
+      <VisitsSection
         detail={detail}
         currentUserId={currentUserId}
         memberName={memberName}
-        memberColor={memberColor}
-        reload={reload}
+        reload={async () => {
+          await reload();
+          onChanged();
+        }}
       />
+
+      {/* Comments — hidden for now (API/data kept). Re-enable by restoring
+          <CommentsSection … /> here. */}
 
       {/* Danger */}
       <DeletePlace
@@ -202,10 +239,12 @@ function DetailBody({
 
 function ReactionView({
   reaction,
+  category,
   name,
   color,
 }: {
   reaction: PlaceReaction;
+  category: PlaceCategory;
   name: string;
   color: string;
 }) {
@@ -218,13 +257,15 @@ function ReactionView({
         </div>
         <div className="flex items-center gap-1.5">
           <span className="chip bg-blush-50 text-blush-500">
-            {reaction.wantToGo ? "💖 가고 싶어" : "🤍 글쎄"}
+            {reaction.wantToGo ? `💖 ${wantLabel(category)}` : "🤍 글쎄"}
           </span>
           <span className={`chip ${priorityClasses[reaction.priority]}`}>
             {priorityLabels[reaction.priority]}
           </span>
           {reaction.visited && (
-            <span className="chip bg-emerald-50 text-emerald-600">✓ 방문</span>
+            <span className="chip bg-emerald-50 text-emerald-600">
+              ✓ {doneLabel(category)}
+            </span>
           )}
         </div>
       </div>
@@ -239,10 +280,12 @@ function ReactionView({
 
 function MyReactionEditor({
   placeId,
+  category,
   reaction,
   onSaved,
 }: {
   placeId: string;
+  category: PlaceCategory;
   reaction: PlaceReaction | undefined;
   onSaved: () => Promise<void>;
 }) {
@@ -280,7 +323,7 @@ function MyReactionEditor({
               : "bg-white text-zinc-500 ring-blush-100"
           }`}
         >
-          {wantToGo ? "💖 가고 싶어" : "🤍 가고 싶어"}
+          {wantToGo ? `💖 ${wantLabel(category)}` : `🤍 ${wantLabel(category)}`}
         </button>
         <button
           type="button"
@@ -291,7 +334,7 @@ function MyReactionEditor({
               : "bg-white text-zinc-500 ring-blush-100"
           }`}
         >
-          {visited ? "✓ 다녀옴" : "다녀옴"}
+          {visited ? `✓ ${doneLabel(category)}` : doneLabel(category)}
         </button>
       </div>
 
@@ -332,91 +375,9 @@ function MyReactionEditor({
   );
 }
 
-function CommentsSection({
-  detail,
-  currentUserId,
-  memberName,
-  memberColor,
-  reload,
-}: {
-  detail: PlaceDetail;
-  currentUserId: string;
-  memberName: (id: string) => string;
-  memberColor: (id: string) => string;
-  reload: () => Promise<void>;
-}) {
-  const [body, setBody] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const add = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!body.trim()) return;
-    setBusy(true);
-    try {
-      await api.addComment(detail.id, body.trim());
-      setBody("");
-      await reload();
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const remove = async (c: PlaceComment) => {
-    await api.deleteComment(c.id);
-    await reload();
-  };
-
-  return (
-    <section className="mt-5">
-      <h3 className="mb-2 text-sm font-semibold text-zinc-500">댓글</h3>
-      {detail.comments.length === 0 ? (
-        <p className="rounded-2xl bg-white px-3 py-3 text-center text-sm text-zinc-300 ring-1 ring-blush-50">
-          이 장소에 대한 첫 댓글을 남겨보세요
-        </p>
-      ) : (
-        <div className="space-y-2">
-          {detail.comments.map((c) => (
-            <div key={c.id} className="flex gap-2">
-              <Avatar name={memberName(c.userId)} color={memberColor(c.userId)} size={28} />
-              <div className="flex-1 rounded-2xl bg-white px-3 py-2 ring-1 ring-blush-50">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-sm font-semibold text-zinc-700">
-                    {memberName(c.userId)}
-                  </span>
-                  <span className="text-[11px] text-zinc-300">
-                    {formatDateTime(c.createdAt)}
-                  </span>
-                </div>
-                <p className="text-sm text-zinc-600">{c.body}</p>
-                {c.userId === currentUserId && (
-                  <button
-                    type="button"
-                    onClick={() => remove(c)}
-                    className="mt-1 text-[11px] text-zinc-300 hover:text-red-400"
-                  >
-                    삭제
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <form onSubmit={add} className="mt-3 flex gap-2">
-        <input
-          className="input"
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="댓글 남기기…"
-        />
-        <button type="submit" disabled={busy} className="btn-soft shrink-0">
-          등록
-        </button>
-      </form>
-    </section>
-  );
-}
+// NOTE: the comments UI (CommentsSection) was hidden by request. The API
+// (/api/places/:id/comments, /api/comments/:id) and data are still intact,
+// so it can be restored from git history if wanted.
 
 function DeletePlace({
   placeId,
@@ -471,5 +432,312 @@ function DeletePlace({
         </button>
       )}
     </div>
+  );
+}
+
+function EditPlaceForm({
+  detail,
+  onCancel,
+  onSaved,
+}: {
+  detail: PlaceDetail;
+  onCancel: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const [name, setName] = useState(detail.name);
+  const [category, setCategory] = useState<PlaceCategory>(detail.category);
+  const [address, setAddress] = useState(detail.address);
+  const [mapUrl, setMapUrl] = useState(detail.mapUrl);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      setError("장소 이름을 입력해 주세요");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await api.updatePlace(detail.id, {
+        name: name.trim(),
+        category,
+        address: address.trim(),
+        mapUrl: mapUrl.trim(),
+      });
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "저장에 실패했습니다");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      <h2 className="mb-4 text-lg font-bold text-zinc-800">장소 정보 수정</h2>
+      <form onSubmit={save} className="space-y-4">
+        <div>
+          <label className="label">장소 이름</label>
+          <input
+            className="input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoFocus
+          />
+        </div>
+        <div>
+          <label className="label">카테고리</label>
+          <div className="flex flex-wrap gap-2">
+            {categoryList.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCategory(c)}
+                className={`chip ring-1 ${
+                  category === c
+                    ? "bg-blush-400 text-white ring-blush-400"
+                    : "bg-white text-zinc-500 ring-blush-100"
+                }`}
+              >
+                {categoryEmoji[c]} {categoryLabels[c]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label className="label">주소</label>
+          <input
+            className="input"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="예) 서울 마포구 연남동"
+          />
+        </div>
+        <div>
+          <label className="label">정보 링크 (사이트·블로그)</label>
+          <input
+            className="input"
+            value={mapUrl}
+            onChange={(e) => setMapUrl(e.target.value)}
+            placeholder="블로그·홈페이지 등 참고 링크"
+          />
+        </div>
+        {error && <p className="text-sm text-red-500">{error}</p>}
+        <div className="flex gap-2 pt-1">
+          <button type="button" onClick={onCancel} className="btn-ghost flex-1">
+            취소
+          </button>
+          <button type="submit" disabled={saving} className="btn-primary flex-1">
+            {saving ? "저장 중…" : "저장"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function VisitsSection({
+  detail,
+  currentUserId,
+  memberName,
+  reload,
+}: {
+  detail: PlaceDetail;
+  currentUserId: string;
+  memberName: (id: string) => string;
+  reload: () => Promise<void>;
+}) {
+  const { config } = useSession();
+  const photosEnabled = config?.photosEnabled ?? false;
+  const [adding, setAdding] = useState(false);
+  const [visitedAt, setVisitedAt] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
+  const [note, setNote] = useState("");
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const resetForm = () => {
+    setAdding(false);
+    setNote("");
+    setPendingFiles([]);
+  };
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const visit = await api.addVisit(detail.id, {
+        visitedAt,
+        note: note.trim(),
+      });
+      for (const file of pendingFiles) {
+        const blob = await compressImage(file);
+        await api.uploadVisitPhoto(visit.id, blob);
+      }
+      resetForm();
+      await reload();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "저장 실패");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="mt-5">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-zinc-500">
+          {isExperience(detail.category) ? "함께한 기록" : "방문 기록"}
+        </h3>
+        {!adding && (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="chip bg-blush-50 text-blush-500"
+          >
+            + 기록 남기기
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <form onSubmit={save} className="card mb-2 space-y-2">
+          <input
+            type="date"
+            className="input"
+            value={visitedAt}
+            max={new Date().toISOString().slice(0, 10)}
+            onChange={(e) => setVisitedAt(e.target.value)}
+          />
+          <textarea
+            className="input min-h-[64px] resize-none"
+            placeholder="한 줄 후기 (예: 분위기 최고, 다음엔 평일에!)"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+
+          {photosEnabled && (
+            <div>
+              {pendingFiles.length > 0 && (
+                <div className="mb-2 grid grid-cols-3 gap-1.5">
+                  {pendingFiles.map((f, i) => (
+                    <div
+                      key={i}
+                      className="relative aspect-square overflow-hidden rounded-xl ring-1 ring-blush-50"
+                    >
+                      <img
+                        src={URL.createObjectURL(f)}
+                        alt="첨부 미리보기"
+                        className="h-full w-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPendingFiles((prev) =>
+                            prev.filter((_, idx) => idx !== i),
+                          )
+                        }
+                        className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/50 text-xs text-white"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="btn-soft w-full py-2 text-sm"
+              >
+                📷 사진 첨부
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []).filter((f) =>
+                    f.type.startsWith("image/"),
+                  );
+                  setPendingFiles((prev) => [...prev, ...files]);
+                  if (fileRef.current) fileRef.current.value = "";
+                }}
+              />
+            </div>
+          )}
+
+          {error && <p className="text-sm text-red-500">{error}</p>}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={resetForm}
+              className="btn-ghost flex-1 py-2"
+            >
+              취소
+            </button>
+            <button
+              type="submit"
+              disabled={busy}
+              className="btn-primary flex-1 py-2"
+            >
+              {busy ? "저장 중…" : "저장"}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {detail.visits.length === 0 && !adding ? (
+        <p className="rounded-2xl bg-white px-3 py-3 text-sm text-zinc-300 ring-1 ring-blush-50">
+          아직 기록이 없어요
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {detail.visits.map((v) => (
+            <div
+              key={v.id}
+              className="rounded-2xl bg-white px-3 py-2.5 ring-1 ring-blush-50"
+            >
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-xs font-semibold text-blush-400">
+                  📖 {v.visitedAt}
+                </span>
+                <span className="text-[11px] text-zinc-300">
+                  {memberName(v.createdBy)}
+                  {v.createdBy === currentUserId && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await api.deleteVisit(v.id);
+                        await reload();
+                      }}
+                      className="ml-2 text-zinc-300 hover:text-red-400"
+                    >
+                      삭제
+                    </button>
+                  )}
+                </span>
+              </div>
+              {v.note && (
+                <p className="mt-1 text-sm text-zinc-600">{v.note}</p>
+              )}
+              <VisitPhotos
+                visitId={v.id}
+                photoIds={v.photos}
+                canEdit={v.createdBy === currentUserId}
+                onChanged={reload}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

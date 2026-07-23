@@ -10,3 +10,8 @@ binding = "DB"
 database_name = "couple-date-wishlist"
 database_id = "c3b36880-b9ee-4316-aeab-43bda6683aa2"
 migrations_dir = "migrations"
+
+# R2 bucket for visit photos, bound as `PHOTOS`.
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "ouple-date-photos"

@@ -8,6 +8,8 @@ import {
   getPushState,
   type PushState,
 } from "@/lib/push";
+import { ChangelogModal } from "@/components/WhatsNew";
+import { latestVersion } from "@/data/changelog";
 
 export function CouplePage() {
   const { session, refresh, logout } = useSession();
@@ -257,6 +259,8 @@ function CoupleSettings() {
         </div>
       </section>
 
+      <ChangelogSection />
+
       <button
         type="button"
         onClick={logout}
@@ -268,15 +272,67 @@ function CoupleSettings() {
   );
 }
 
+function ChangelogSection() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="card flex w-full items-center justify-between text-left"
+      >
+        <div>
+          <h3 className="text-sm font-semibold text-zinc-500">
+            🎁 업데이트 소식
+          </h3>
+          <p className="mt-0.5 text-xs text-zinc-400">
+            현재 버전 {latestVersion} · 새 기능을 확인해 보세요
+          </p>
+        </div>
+        <span className="text-blush-300">›</span>
+      </button>
+      {open && <ChangelogModal onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
 function NotificationSection() {
   const { config } = useSession();
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [testMsg, setTestMsg] = useState<string | null>(null);
 
   useEffect(() => {
     void getPushState().then(setState);
   }, []);
+
+  const test = async () => {
+    setBusy(true);
+    setTestMsg("보내는 중…");
+    try {
+      const r = await api.pushTest();
+      const sc = r.selfCheck;
+      const scMsg = sc.signatureValid
+        ? `키 정상 · sub=${sc.subject}`
+        : `⚠️ VAPID 키 불일치 (private/public 안 맞음) · sub=${sc.subject}`;
+      if (r.subscriptions === 0) {
+        setTestMsg(`구독 정보가 없어요. 알림을 껐다가 다시 켜주세요.\n${scMsg}`);
+      } else {
+        const o = r.outcomes[0];
+        setTestMsg(
+          (o.ok
+            ? `전송 성공 (status ${o.status}) — 잠시 후 알림이 와야 해요.`
+            : `전송 실패 (status ${o.status})${o.error ? `: ${o.error}` : ""}`) +
+            `\n${scMsg}`,
+        );
+      }
+    } catch (err) {
+      setTestMsg(err instanceof Error ? err.message : "테스트 실패");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   if (config && !config.pushEnabled) return null; // push not configured on server
 
@@ -322,14 +378,29 @@ function NotificationSection() {
           알림이 차단되어 있어요. 기기 설정에서 이 앱의 알림을 허용해 주세요.
         </p>
       ) : state === "on" ? (
-        <button
-          type="button"
-          onClick={disable}
-          disabled={busy}
-          className="btn-ghost mt-3 w-full"
-        >
-          {busy ? "처리 중…" : "🔔 알림 끄기"}
-        </button>
+        <div className="mt-3 space-y-2">
+          <button
+            type="button"
+            onClick={test}
+            disabled={busy}
+            className="btn-primary w-full"
+          >
+            {busy ? "처리 중…" : "🔔 테스트 알림 보내기"}
+          </button>
+          <button
+            type="button"
+            onClick={disable}
+            disabled={busy}
+            className="btn-ghost w-full"
+          >
+            알림 끄기
+          </button>
+          {testMsg && (
+            <p className="whitespace-pre-line break-all text-xs text-zinc-500">
+              {testMsg}
+            </p>
+          )}
+        </div>
       ) : (
         <button
           type="button"
