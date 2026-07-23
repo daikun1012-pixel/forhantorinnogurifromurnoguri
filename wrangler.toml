@@ -14,4 +14,4 @@ migrations_dir = "migrations"
 # R2 bucket for visit photos, bound as `PHOTOS`.
 [[r2_buckets]]
 binding = "PHOTOS"
-bucket_name = "couple-date-photos"
+bucket_name = "ouple-date-photos"
