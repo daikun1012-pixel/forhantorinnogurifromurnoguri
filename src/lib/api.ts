@@ -17,6 +17,7 @@ export interface AppConfig {
   searchEnabled: boolean;
   vapidPublicKey: string;
   pushEnabled: boolean;
+  photosEnabled: boolean;
 }
 
 export interface SearchResult {
@@ -33,6 +34,11 @@ const USER_KEY = "cdw_user_id";
 
 export function getStoredUserId(): string | null {
   return localStorage.getItem(USER_KEY);
+}
+
+/** URL to display a visit photo (public by unguessable id). */
+export function photoUrl(id: string): string {
+  return `/api/photos/${id}`;
 }
 export function setStoredUserId(id: string | null): void {
   if (id) localStorage.setItem(USER_KEY, id);
@@ -158,6 +164,23 @@ export const api = {
     req<Visit>(`/places/${placeId}/visits`, { method: "POST", body: input }),
   deleteVisit: (visitId: string) =>
     req<{ id: string }>(`/visits/${visitId}`, { method: "DELETE" }),
+  uploadVisitPhoto: async (visitId: string, blob: Blob) => {
+    const headers: Record<string, string> = { "Content-Type": blob.type };
+    const userId = getStoredUserId();
+    if (userId) headers["X-User-Id"] = userId;
+    const res = await fetch(`/api/visits/${visitId}/photos`, {
+      method: "POST",
+      headers,
+      body: blob,
+    });
+    const json = await res.json().catch(() => ({ ok: false }));
+    if (!res.ok || !json.ok) {
+      throw new ApiError(json.error ?? "업로드 실패", res.status);
+    }
+    return json.data as { id: string };
+  },
+  deletePhoto: (photoId: string) =>
+    req<{ id: string }>(`/photos/${photoId}`, { method: "DELETE" }),
 
   addComment: (placeId: string, body: string) =>
     req<PlaceComment>(`/places/${placeId}/comments`, {

@@ -75,5 +75,5 @@ export const onRequestPost: PagesFunction<Env> = ({
       ),
     );
 
-    return success(toVisit(visit), 201);
+    return success({ ...toVisit(visit), photos: [] }, 201);
   });

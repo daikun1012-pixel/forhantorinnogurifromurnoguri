@@ -22,6 +22,7 @@ import type {
 } from "@/types";
 import { Modal } from "./Modal";
 import { Avatar, ErrorState, Spinner } from "./ui";
+import { VisitPhotos } from "./VisitPhotos";
 
 const PRIORITIES: Priority[] = ["low", "medium", "high"];
 
@@ -745,6 +746,12 @@ function VisitsSection({
               {v.note && (
                 <p className="mt-1 text-sm text-zinc-600">{v.note}</p>
               )}
+              <VisitPhotos
+                visitId={v.id}
+                photoIds={v.photos}
+                canEdit={v.createdBy === currentUserId}
+                onChanged={reload}
+              />
             </div>
           ))}
         </div>

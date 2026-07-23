@@ -10,6 +10,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "1.9",
+    date: "2026-07-15",
+    title: "추억에 사진을 남겨요 📷",
+    items: [
+      "방문 기록에 사진 첨부 (여러 장 가능)",
+      "추억 탭·장소 상세에서 사진 보기",
+      "업로드 전 자동으로 크기를 줄여 빠르게",
+    ],
+  },
+  {
     version: "1.8",
     date: "2026-07-15",
     title: "장소가 아니어도 좋아요 🎬🍰",

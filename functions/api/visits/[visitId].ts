@@ -15,6 +15,17 @@ export const onRequestDelete: PagesFunction<Env> = ({ env, request, params }) =>
       .first();
     if (!row) throw new HttpError("기록을 찾을 수 없습니다", 404);
 
+    // Remove any attached photos from R2 before the metadata cascades away.
+    if (env.PHOTOS) {
+      const { results } = await ctx.db
+        .prepare(`SELECT r2_key FROM visit_photos WHERE visit_id = ?`)
+        .bind(visitId)
+        .all<{ r2_key: string }>();
+      for (const p of results ?? []) {
+        await env.PHOTOS.delete(p.r2_key);
+      }
+    }
+
     await env.DB.prepare(`DELETE FROM visits WHERE id = ?`)
       .bind(visitId)
       .run();

@@ -82,6 +82,7 @@ export interface Visit {
   note: string;
   createdBy: string;
   createdAt: string;
+  photos: string[]; // photo ids; image url is /api/photos/:id
 }
 
 /** A visit joined with its place info (for the memories timeline). */

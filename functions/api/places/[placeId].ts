@@ -34,7 +34,7 @@ export const onRequestGet: PagesFunction<Env> = ({ env, request, params }) =>
     const placeId = String(params.placeId);
     const place = await loadPlace(ctx, coupleId, placeId);
 
-    const [reactions, comments, visits] = await Promise.all([
+    const [reactions, comments, visits, photos] = await Promise.all([
       ctx.db
         .prepare(`SELECT * FROM place_reactions WHERE place_id = ?`)
         .bind(placeId)
@@ -51,13 +51,31 @@ export const onRequestGet: PagesFunction<Env> = ({ env, request, params }) =>
         )
         .bind(placeId)
         .all(),
+      ctx.db
+        .prepare(
+          `SELECT id, visit_id FROM visit_photos
+             WHERE visit_id IN (SELECT id FROM visits WHERE place_id = ?)
+             ORDER BY created_at ASC`,
+        )
+        .bind(placeId)
+        .all<{ id: string; visit_id: string }>(),
     ]);
+
+    const photosByVisit = new Map<string, string[]>();
+    for (const ph of photos.results ?? []) {
+      const list = photosByVisit.get(ph.visit_id) ?? [];
+      list.push(ph.id);
+      photosByVisit.set(ph.visit_id, list);
+    }
 
     return success({
       ...toPlace(place),
       reactions: (reactions.results ?? []).map(toReaction),
       comments: (comments.results ?? []).map(toComment),
-      visits: (visits.results ?? []).map(toVisit),
+      visits: (visits.results ?? []).map((r) => ({
+        ...toVisit(r),
+        photos: photosByVisit.get(String(r.id)) ?? [],
+      })),
     });
   });
 
